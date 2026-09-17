@@ -17,6 +17,7 @@ Tokens
 - Pipe noisy commands: `| tail -n 60`, `--silent`, `-q`. Never dump full logs.
 - Edit, don't rewrite whole files.
 - Delegate wide searches to a subagent; keep only its conclusion.
+- Never `sleep`/poll waiting for a subagent or a command you already launched synchronously.
 
 Done means
 - Built and tests run green in this session, with the command shown. Otherwise say "not verified" and why.

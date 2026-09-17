@@ -139,14 +139,20 @@ Quello che non è in allowlist viene rifiutato senza chiedere (force push, reset
 claude -p "/ba:auto merge" --permission-mode auto > ba-auto.log
 ```
 
+**Parallelo e worktree (dalla 0.4.0)**: ogni issue lavora in una copia separata del repo creata con `git worktree` in `../<repo>-ba/<n>`, fuori dalla cartella di lavoro. Visual Studio e il tuo index non vengono mai toccati, e le issue **indipendenti** (deps già fatte) partono insieme, 3 alla volta. Il merge resta uno alla volta, in ordine: se una PR non entra più pulita, la sua copia viene ribasata e ricontrollata. Le copie vengono rimosse dopo il merge; restano solo quelle delle issue bloccate.
+
 Varianti:
 ```
 /ba:auto                                   # tutte le issue aperte, PR impilate, nessun merge
 /ba:auto merge                             # fa merge (squash) di ogni PR verde prima di passare alla successiva
 /ba:auto docs/specs/classifica.md merge    # crea le issue dalla spec approvata e le fa tutte
 /ba:auto max=3                             # solo le prime 3
+/ba:auto par=1                             # una issue alla volta (default: par=3, max 4)
+/ba:auto no-worktree                       # lavora nella cartella corrente, sequenziale
 ```
 **Non si ferma a metà**: un hook `Stop` (stessa idea del plugin ufficiale Anthropic *ralph-loop*) impedisce a Claude di chiudere il turno finché esiste `.ba/auto.lock`. Valvola di sicurezza: max 40 ripartenze (`BA_AUTO_MAX_CONTINUES`). Per fermarlo tu: `Esc`/`Ctrl+C` e cancella `.ba/auto.lock`.
+
+**Se finisce il contesto o si interrompe**: Claude Code compatta la conversazione e continua; `/ba:auto` non si fida della memoria ma di `.ba/auto.json`, aggiornato a ogni passo (branch, tentativo, check, PR, merge). Dopo una compattazione l'hook gli fa rileggere istruzioni + stato. Se la sessione muore (crash, Ctrl+C, PC spento) rilancia lo stesso comando: l'issue a metà riparte dal suo branch, prima ricontrolla quello che c'è già e poi continua dal tentativo successivo, senza aprire PR doppie. Al massimo si perde il passo in corso.
 
 Durante il lavoro: decisioni prese al posto tuo in `.ba/auto.md`, stato in `.ba/auto.json`, motivi dei fallimenti in `.ba/runs/<n>.md` e come commento sull'issue. Se lo interrompi, rilancia lo stesso comando: salta le issue già fatte.
 

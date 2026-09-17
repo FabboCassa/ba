@@ -12,5 +12,5 @@ if (( n > MAX )); then
 fi
 echo "$n" > "$LOCK"
 cat <<JSON
-{"decision":"block","reason":"ba:auto still running (continue $n/$MAX). Read .ba/auto.json, resume the queue from the next issue not done/blocked/skipped. Do not ask the user anything. When every issue is processed: print the final report, then delete .ba/auto.lock."}
+{"decision":"block","reason":"ba:auto still running (continue $n/$MAX). Re-read ${CLAUDE_PLUGIN_ROOT}/skills/auto/SKILL.md (your instructions may have been compacted) and .ba/auto.json (source of truth). Resume in_progress issues first, then the next issue not done/blocked/skipped. Do not ask the user anything. When every issue is processed: print the final report, then delete .ba/auto.lock."}
 JSON
