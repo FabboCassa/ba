@@ -11,7 +11,8 @@ Args: $ARGUMENTS
 Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 # Autonomous mode — hard rules
-- Add `.ba/auto.lock` to `.gitignore` if missing.
+- Add `.ba/auto.lock`, `.ba/auto.count` and `.ba/logs/` to `.gitignore` if missing.
+- The branch must contain ONLY this issue's changes: files already modified before the run (the user's own work in progress) are never committed — list them in the report instead.
 - NEVER ask the user anything. NEVER end your turn until the final report. Ambiguity → choose the option most consistent with the spec + existing code, log it under `Decisions` in `.ba/auto.md`, continue.
 - Roles are separated. You (orchestrator) never write product code or tests. **Writer** = agent `ba:implementer`. **Checkers** = agents `ba:verifier` and `ba:reviewer`. A checker never receives the writer's reasoning, only: issue text, file lists, branch.
 - A PASS exists only if the checker ran the commands itself in this attempt. Writer claims ("tests pass") are ignored.
@@ -20,7 +21,7 @@ Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 - If you notice the conversation was compacted or you're unsure where you are: re-read this file (`${CLAUDE_SKILL_DIR}/SKILL.md`) and `.ba/auto.json`, then resume per step 0.4.
 
 # 0. Setup
-1. `mkdir -p .ba && echo 0 > .ba/auto.lock` (a Stop hook keeps you running while it exists). `gh auth status`, `git status --porcelain` (dirty → `git stash -u -m ba-auto` and log it), `git fetch -q`.
+1. `mkdir -p .ba && echo "${CLAUDE_SESSION_ID}" > .ba/auto.lock && echo 0 > .ba/auto.count` (a Stop hook keeps THIS session running while the lock holds its id; a lock left by another session is ignored). `gh auth status`, `git status --porcelain` (dirty → `git stash -u -m ba-auto` and log it), `git fetch -q`.
 2. If args contain a `.md` spec: follow `${CLAUDE_SKILL_DIR}/../issues/SKILL.md` but **skip its confirmation step** (the approved spec is the confirmation). If spec `Status` isn't `approved`, stop with that error — never invent requirements.
 3. Queue = open issues from `.ba/plan.json`, else `gh issue list --label ba --state open --json number,body`. Parse `Depends on`. Topological sort. Drop issues labelled `blocked`. Apply `max=N` if given.
 4. Resume (after compaction, crash, Ctrl+C or a new session): if `.ba/auto.json` exists, it is the ONLY source of truth — not your memory.
@@ -55,6 +56,8 @@ Follow `${CLAUDE_SKILL_DIR}/../implement/SKILL.md` sections 0-3 exactly, with th
 - After PASS + review OK + PR: if MERGE → `gh pr checks <pr> --watch --fail-fast` (skip if no checks configured), then `gh pr merge <pr> --squash --delete-branch`, `git switch <base> && git pull -q`. Checks red → treat as FAIL for the loop (re-attempt on same branch).
 - 3 FAILs → label `blocked`, record reasons, continue with next independent issue.
 
+**Writing `.ba/auto.json` is a HARD GATE, not bookkeeping.** Before dispatching any writer, and before every merge, the state file must already contain that issue's current entry — if you are about to call an agent and have not written it, write it first. A run that ends with `{"issues":{}}` is a bug: it means nothing can be resumed.
+
 Record `wave` and `worktree` per issue. Checkpoint `.ba/auto.json` at EVERY step change (branch created, each writer attempt, each check result, PR opened, merged), not only at the end:
 `{"issues":{"14":{"status":"in_progress|done|blocked|skipped","phase":"write|verify|review|pr|merge","branch":"feat/14-x","worktree":"../repo-ba/14","wave":2,"attempt":2,"pr":21,"reason":""}}}`
 Write it before starting the step, so a context reset never loses more than the step in flight.
@@ -69,4 +72,4 @@ ba:auto — <done>/<total> done, <blocked> blocked, <skipped> skipped (par=<PAR>
 Decisions: <n> logged in .ba/auto.md
 ```
 Leftover worktrees of blocked issues: list their paths. If a stash was made, say so (`git stash pop` to restore).
-Then delete `.ba/auto.lock` — only after the report. On a fatal stop (auth missing, spec not approved) delete it too, after printing the error.
+Then delete `.ba/auto.lock` and `.ba/auto.count` — only after the report. On a fatal stop (auth missing, spec not approved) delete it too, after printing the error.
