@@ -1,0 +1,16 @@
+{
+  "name": "ba",
+  "owner": {
+    "name": "Fabio Casarini"
+  },
+  "plugins": [
+    {
+      "name": "ba",
+      "source": "./",
+      "description": "Terse coding + spec-to-PR workflow with real tests and mandatory build."
+    }
+  ],
+  "metadata": {
+    "description": "ba: terse token-efficient coding and spec-to-PR workflow"
+  }
+}

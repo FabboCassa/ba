@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "cat \"${CLAUDE_PLUGIN_ROOT}/templates/terse-rules.md\"" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/auto-guard.sh\"" } ] }
+    ]
+  }
+}

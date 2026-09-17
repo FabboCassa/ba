@@ -1,0 +1,8 @@
+{
+  "name": "ba",
+  "version": "0.2.0",
+  "description": "Terse, token-efficient coding + spec -> GitHub issues -> branch/test/build/PR per issue.",
+  "author": { "name": "Fabio Casarini" },
+  "license": "MIT",
+  "keywords": ["tdd", "github-issues", "spec", "token-efficiency"]
+}

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read", "Edit", "Write", "Grep", "Glob", "Agent", "Skill",
+      "Bash(git *)", "Bash(gh *)", "Bash(bash *)", "Bash(jq *)",
+      "Bash(npm *)", "Bash(npx *)", "Bash(pnpm *)", "Bash(yarn *)", "Bash(node *)",
+      "Bash(dotnet *)", "Bash(python *)", "Bash(python3 *)", "Bash(pytest *)",
+      "Bash(cargo *)", "Bash(go *)", "Bash(make *)", "Bash(ls *)", "Bash(cat *)", "Bash(tail *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)", "Bash(git push -f*)", "Bash(git reset --hard*)",
+      "Bash(rm -rf /*)", "Bash(gh repo delete*)", "Read(./.env*)"
+    ]
+  }
+}
