@@ -11,13 +11,14 @@ Args: $ARGUMENTS
 Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 # Autonomous mode — hard rules
-- Add `.ba/auto.lock`, `.ba/auto.count` and `.ba/logs/` to `.gitignore` if missing.
+- Add `.ba/auto.lock`, `.ba/auto.count`, `.ba/auto.waiting` and `.ba/logs/` to `.gitignore` if missing.
 - The branch must contain ONLY this issue's changes: files already modified before the run (the user's own work in progress) are never committed — list them in the report instead.
 - NEVER ask the user anything. NEVER end your turn until the final report. Ambiguity → choose the option most consistent with the spec + existing code, log it under `Decisions` in `.ba/auto.md`, continue.
 - Roles are separated. You (orchestrator) never write product code or tests. **Writer** = agent `ba:implementer`. **Checkers** = agents `ba:verifier` and `ba:reviewer`. A checker never receives the writer's reasoning, only: issue text, file lists, branch.
 - A PASS exists only if the checker ran the commands itself in this attempt. Writer claims ("tests pass") are ignored.
 - Context budget: keep per-issue only a ≤3-line result. Details go to files.
-- NEVER poll or sleep waiting for an agent (`sleep`, `seq ... sleep`, watch loops). An Agent call already returns when the agent is done. Waiting loops burn wall clock and tokens for nothing.
+- NEVER poll, sleep or "check if it finished" while an agent runs (`sleep`, `seq ... sleep`, watch loops, repeated `git status`, repeated log reads). It burns tokens and the continue budget for nothing.
+- **Backgrounded agents**: if a dispatch reports the agent was backgrounded, you do NOT get its result in this turn. Write its task id into `.ba/auto.waiting` (one line per pending agent: `<issue> <task id> <role>`) and then END YOUR TURN — the Stop hook lets you stop while that file exists. You are re-invoked automatically when the agent finishes: then remove its line from `.ba/auto.waiting` (delete the file when empty), read its result and continue. Repeating "waiting for the writer" turn after turn is a bug, not progress.
 - If you notice the conversation was compacted or you're unsure where you are: re-read this file (`${CLAUDE_SKILL_DIR}/SKILL.md`) and `.ba/auto.json`, then resume per step 0.4.
 
 # 0. Setup
@@ -72,4 +73,4 @@ ba:auto — <done>/<total> done, <blocked> blocked, <skipped> skipped (par=<PAR>
 Decisions: <n> logged in .ba/auto.md
 ```
 Leftover worktrees of blocked issues: list their paths. If a stash was made, say so (`git stash pop` to restore).
-Then delete `.ba/auto.lock` and `.ba/auto.count` — only after the report. On a fatal stop (auth missing, spec not approved) delete it too, after printing the error.
+Then delete `.ba/auto.lock`, `.ba/auto.count` and any `.ba/auto.waiting` — only after the report. On a fatal stop (auth missing, spec not approved) delete it too, after printing the error.

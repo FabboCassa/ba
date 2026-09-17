@@ -4,7 +4,10 @@
 DIR="${CLAUDE_PROJECT_DIR:-.}"
 LOCK="$DIR/.ba/auto.lock"
 COUNT="$DIR/.ba/auto.count"
+WAITING="$DIR/.ba/auto.waiting"
 [[ -f "$LOCK" ]] || exit 0
+# Agents are running in the background: stopping is correct, the run resumes on their notification.
+[[ -s "$WAITING" ]] && exit 0
 
 payload=$(cat 2>/dev/null)
 sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
