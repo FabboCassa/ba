@@ -1,8 +1,18 @@
 {
   "name": "ba",
-  "version": "0.6.0",
-  "description": "Terse, token-efficient coding + spec -> GitHub issues -> branch/test/build/PR per issue.",
-  "author": { "name": "Fabio Casarini" },
+  "version": "0.7.0",
+  "description": "Terse, token-efficient coding + spec -> GitHub issues -> branch/test/build/PR per issue, plus optimize and security audits.",
+  "author": {
+    "name": "Fabio Casarini"
+  },
   "license": "MIT",
-  "keywords": ["tdd", "github-issues", "spec", "token-efficiency"]
+  "keywords": [
+    "tdd",
+    "github-issues",
+    "spec",
+    "token-efficiency",
+    "security",
+    "performance",
+    "refactoring"
+  ]
 }

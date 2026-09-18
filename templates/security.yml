@@ -1,0 +1,45 @@
+# ba weekly security scan - installed by /ba:secure. Zero LLM tokens.
+# Secrets (gitleaks, full history, redacted) + vulnerable dependencies (osv-scanner, all lockfiles).
+# On findings it opens (or comments on) ONE issue labelled "security"; details stay in the run log.
+name: ba-security
+on:
+  schedule: [{ cron: "0 6 * * 1" }]   # Mondays 06:00 UTC
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+  issues: write
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: gitleaks (tree + history, redacted)
+        id: secrets
+        continue-on-error: true
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:latest \
+            git /repo --redact --no-banner -v
+      - name: osv-scanner (dependencies)
+        id: deps
+        continue-on-error: true
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:latest \
+            scan source -r /src
+      - name: open or update issue
+        if: steps.secrets.outcome == 'failure' || steps.deps.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          S: ${{ steps.secrets.outcome }}
+          D: ${{ steps.deps.outcome }}
+        run: |
+          gh label create security --color B60205 --force >/dev/null
+          BODY="Weekly scan found problems. secrets: $S, dependencies: $D. Run: $RUN
+          Run \`/ba:secure\` locally for triage and fix issues."
+          N=$(gh issue list --label security --state open --search "ba-security scan in:title" --json number -q '.[0].number')
+          if [ -n "$N" ]; then gh issue comment "$N" --body "$BODY"
+          else gh issue create --title "ba-security scan: findings to triage" --label security --body "$BODY"; fi
+          exit 1
