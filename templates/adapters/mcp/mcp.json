@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ba": {
+      "command": "python",
+      "args": [
+        "${PROJECT_ROOT}/mcp/server.py"
+      ],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# ba Cursor Rules
+- Always be terse: no polite fluff, no preambles, max 3-5 lines summary.
+- Lead with code or verification results.
+- Never claim tests pass without executing the test command in the current turn.
+- Strictly separate the Writer (implementer) mindset from the Checker (verifier) mindset.
+- Always run `bash scripts/gate.sh .` or `bin/ba gate` before declaring an implementation complete.
+- For new features and security fixes, follow RED -> GREEN verification: tests must fail when the implementation is missing and pass when applied (`bash scripts/prove-test.sh "<test-cmd>" <test-files...>`).
+- Comments: only explain the non-obvious WHY, never the WHAT.

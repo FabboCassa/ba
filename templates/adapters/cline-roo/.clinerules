@@ -1,0 +1,13 @@
+# ba Cline / Roo Code Rules
+
+## General Principles
+- Token Efficiency: be concise. Never apologize, never use filler sentences.
+- Lead with actionable diffs or verification results (max 3-5 lines).
+- Follow the writer vs checker role separation.
+- Always execute `bash scripts/gate.sh .` before considering work done.
+
+## Verification
+- For new features and security fixes: write tests first (RED), then implement (GREEN).
+- Run `bash scripts/prove-test.sh "<cmd>" <test-files>` to prove the test is genuine and not tautological.
+- Never weaken assertions, delete tests, or add skips to make tests pass.
+- Comments: non-obvious WHY only. No comment on WHAT the code does.
