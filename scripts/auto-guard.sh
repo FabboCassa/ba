@@ -21,5 +21,5 @@ echo "$n" > "$COUNT"
 (( n > MAX )) && exit 0   # safety valve
 
 cat <<JSON
-{"decision":"block","reason":"ba:auto still running (continue $n/$MAX). Re-read \${CLAUDE_PLUGIN_ROOT}/skills/auto/SKILL.md (your instructions may have been compacted) and .ba/auto.json (source of truth). Resume in_progress issues first, then the next issue not done/blocked/skipped. Do not ask the user anything. When every issue is processed: print the final report, then delete .ba/auto.lock and .ba/auto.count."}
+{"decision":"block","reason":"ba:auto still running (continue $n/$MAX). Re-read \${CLAUDE_PLUGIN_ROOT:-.}/skills/auto/SKILL.md (your instructions may have been compacted) and .ba/auto.json (source of truth). Resume in_progress issues first, then the next issue not done/blocked/skipped. Do not ask the user anything. When every issue is processed: print the final report, then delete .ba/auto.lock and .ba/auto.count."}
 JSON

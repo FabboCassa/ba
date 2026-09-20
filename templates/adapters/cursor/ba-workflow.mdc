@@ -1,0 +1,18 @@
+---
+description: BetterAI (ba) TDD and Verification Workflow
+globs: "*"
+alwaysApply: true
+---
+# BetterAI (ba) Workflow
+
+## Output Guidelines
+- Terse communication: no introductory or concluding filler.
+- Report changed files and concrete test results in ≤5 lines.
+- Do not repeat or echo code snippets already visible in diffs unless requested.
+
+## Verification Checklist
+1. Identify commands: `bash scripts/detect.sh .`
+2. Test-First (TDD): write the test, run it to verify failure, implement code, verify pass.
+3. Test Proof: run `bash scripts/prove-test.sh "<test-cmd>" <test-files...>` to eliminate fake tests.
+4. Gate: always run `bash scripts/gate.sh .` before finishing. All checks must be green.
+5. Secrets: never include API keys, passwords, or credentials in commits.

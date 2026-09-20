@@ -1,8 +1,18 @@
-# ba — plugin Claude Code
+# ba (BetterAI) — Multi-AI Terse & Verified Coding Engine
 
 Meno token, meno chiacchiere, codice verificato. Flusso: **idea → domande → spec → issue GitHub → branch/test reale/build/PR per ogni issue**. In più due audit, **ottimizzazione** e **sicurezza**, che trasformano i problemi trovati in issue e passano dallo stesso flusso.
 
-## Installazione
+Progettato per funzionare con **qualsiasi AI**:
+- **Claude Code**: Plugin nativo con hook e skill (`/plugin install ba@ba`).
+- **Gemini & Google Antigravity**: Standard `AGENTS.md`, `GEMINI.md`, skill Antigravity compatibili.
+- **DeepSeek & Qwen**: Modalità separate per Roo Code e Cline (`.clinerules`, `.roomodes` con i 4 ruoli).
+- **OpenAI / ChatGPT / Codex / Cursor / Windsurf / Copilot**: `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md`.
+- **Model Context Protocol (MCP)**: Server `ba-mcp` per qualsiasi assistente o IDE abilitato a MCP.
+- **CLI Indipendente**: Esecuzione deterministica di gate, test proof, scanner e test-times da qualsiasi shell (`ba gate`, `ba prove-test`).
+
+## Installazione Rapida per la Tua AI
+
+### A. Claude Code (Plugin nativo)
 ```bash
 # 1. pubblica questa cartella come repo GitHub (vedi "Pubblicare questo plugin")
 # 2. in Claude Code:
@@ -11,8 +21,61 @@ Meno token, meno chiacchiere, codice verificato. Flusso: **idea → domande → 
 # test locale senza pubblicare:
 claude --plugin-dir /percorso/ba
 ```
-Requisiti: `git`, `gh` autenticato (`gh auth login`), `bash` (su Windows: Git Bash, incluso in Git for Windows), `node` solo per progetti JS, `python3` per `/ba:optimize` (lettura dei report dei test).
-Consigliati per `/ba:secure` (se mancano il comando lo dice e segna "non controllato"): `gitleaks`, `osv-scanner`, `semgrep`, `jq`.
+
+### B. Gemini & Google Antigravity
+Nel tuo progetto:
+```bash
+# Inizializza le istruzioni e regole per Gemini / Antigravity
+ba init gemini
+# oppure copia AGENTS.md e GEMINI.md nella root del progetto
+```
+
+### C. DeepSeek & Qwen (Roo Code / Cline)
+Nel tuo progetto:
+```bash
+# Inizializza .clinerules e le 4 modalità subagente (.roomodes)
+ba init roo
+```
+In Roo Code compariranno 4 modalità dedicate:
+1. `ba-implementer` (Scrittore: implementazione TDD)
+2. `ba-verifier` (Controllore prove: RED->GREEN e gate)
+3. `ba-reviewer` (Reviewer: diff review e sicurezza)
+4. `ba-auditor` (Audit: ottimizzazione e sicurezza)
+
+### D. Cursor / Windsurf / GitHub Copilot
+Nel tuo progetto:
+```bash
+ba init cursor    # crea .cursorrules e .cursor/rules/ba-workflow.mdc
+ba init windsurf  # crea .windsurfrules
+ba init copilot   # crea .github/copilot-instructions.md
+ba init all       # inizializza tutti gli adapter contemporaneamente
+```
+
+### E. Server Model Context Protocol (MCP)
+Per qualsiasi client con supporto MCP (Cursor, Windsurf, Claude Desktop, Antigravity, Roo Code):
+```json
+{
+  "mcpServers": {
+    "ba": {
+      "command": "python",
+      "args": ["/percorso/ba/mcp/server.py"]
+    }
+  }
+}
+```
+Fornisce direttamente all'AI i tool: `ba_gate`, `ba_detect`, `ba_prove_test`, `ba_prove_refactor`, `ba_sec_scan`, `ba_test_times`.
+
+### F. CLI Indipendente (`ba`)
+Aggiungi `ba/bin` al tuo `PATH` (o usa `./bin/ba` / `./bin/ba.ps1` su Windows):
+```bash
+ba gate                     # Build + lint + test compatto
+ba prove-test "<test-cmd>" <file...> # Verifica che il test sia reale (RED->GREEN)
+ba scan secrets             # Scansione segreti su file e storia git
+ba init all                 # Prepara il repository per tutte le AI
+```
+
+Requisiti: `git`, `gh` autenticato (`gh auth login`), `bash` (su Windows: Git Bash, incluso in Git for Windows), `python3` per MCP e `/ba:optimize`.
+Consigliati per `/ba:secure`: `gitleaks`, `osv-scanner`, `semgrep`, `jq`.
 
 ## Comandi
 | Comando | Cosa fa |
@@ -274,10 +337,14 @@ Nota onesta (dai benchmark di claude-token-efficient e caveman): le regole di st
 
 ## Struttura
 ```
-.claude-plugin/{plugin,marketplace}.json
+bin/{ba,ba.cmd,ba.ps1}                               # CLI unificata multipiattaforma
+mcp/server.py                                        # Server Model Context Protocol (zero-dep)
+AGENTS.md, GEMINI.md                                 # Guide standard universali per coding agent
+templates/adapters/{gemini,cursor,windsurf,copilot,cline-roo,mcp} # Template per ogni AI
+.claude-plugin/{plugin,marketplace}.json             # Plugin nativo Claude Code
 skills/{spec,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
 agents/{implementer,verifier,reviewer,auditor}.md
-scripts/{detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard}.sh
+scripts/{ba,detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard}.sh
 hooks/hooks.json   templates/{terse-rules,spec,architecture,settings.auto.json,security.yml}
 ```
 Hook da aggiungere in `hooks/hooks.json` (accanto a `SessionStart` e `Stop` già presenti):

@@ -1,0 +1,7 @@
+# ba Windsurf Rules
+- Terse, token-efficient communication: no conversational filler, no polite preamble, max 3-5 lines final summary.
+- Strict TDD: for new features or security fixes, create tests first (RED), confirm failure, then implement (GREEN).
+- Run `bash scripts/prove-test.sh "<cmd>" <test-files>` to prove tests are real (reverts implementation to verify test failure).
+- Run `bash scripts/gate.sh .` to ensure compilation, linting, and tests pass with compact logs.
+- Preserve existing tests and behavior during refactoring (`bash scripts/prove-refactor.sh origin/main refactor`).
+- Comments must only explain non-obvious WHY (workarounds, invariants). Never narrate WHAT code does.
