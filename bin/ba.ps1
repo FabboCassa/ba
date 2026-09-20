@@ -22,3 +22,4 @@ if (Test-Path $gitBash) {
 } else {
     & bash $BaBashScript @args
 }
+exit $LASTEXITCODE

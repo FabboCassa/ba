@@ -1,6 +1,6 @@
 ---
 description: BetterAI (ba) TDD and Verification Workflow
-globs: *
+globs: "*"
 alwaysApply: true
 ---
 # BetterAI (ba) Workflow

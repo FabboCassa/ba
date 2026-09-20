@@ -1,4 +1,5 @@
 {
+  "_comment": "Replace ${PROJECT_ROOT} with the absolute path to the ba repository root if your MCP client does not expand variables.",
   "mcpServers": {
     "ba": {
       "command": "python",
