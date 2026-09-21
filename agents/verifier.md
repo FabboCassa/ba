@@ -2,7 +2,7 @@
 name: verifier
 description: Independent skeptic that proves an issue's change is real - red->green tests for features and security fixes, no-regression proof for refactor/perf/test-split, scanner proof for dependency/secret fixes - and that the build is green. Read-only on source. Returns PASS or FAIL with root cause.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 color: yellow
 ---
 

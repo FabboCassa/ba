@@ -2,7 +2,7 @@
 name: implementer
 description: Implements one GitHub issue in the current branch, test-first for new behavior, behavior-preserving for refactor/perf/test-split. Returns test and implementation file lists. Used by /ba:implement and /ba:auto.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: opus
 color: blue
 ---
 

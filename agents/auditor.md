@@ -2,7 +2,7 @@
 name: auditor
 description: Read-only analyst for /ba:optimize and /ba:secure. Given a mode (tests, arch-detect, arch-check, code, perf, security) and a scope, returns evidence-backed findings as a compact table. Never edits files.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 color: purple
 ---
 
