@@ -1,6 +1,6 @@
 {
   "name": "ba",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Terse, token-efficient coding + spec -> GitHub issues -> branch/test/build/PR per issue, plus optimize and security audits.",
   "author": {
     "name": "Fabio Casarini"
