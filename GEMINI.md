@@ -3,10 +3,7 @@
 This repository uses **ba (BetterAI)**: token-efficient, verified software development with strict verification gates and real proofs.
 
 ## Core Rules for Gemini & Antigravity
-1. **Terse Responses**:
-   - Zero preambles ("Sure", "I would be happy to help", "Certainly!").
-   - Lead directly with the result or verification proof (max 3-5 lines).
-   - Comments: explain only non-obvious *WHY* (invariants, platform constraints). Never narrate *WHAT*.
+1. **Terse Responses**: Follow `templates/terse-rules.md` (single source for output and comment rules).
 
 2. **Writer vs Checker Separation**:
    - **Writer (`implementer`)**:

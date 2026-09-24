@@ -2,7 +2,7 @@
 name: reviewer
 description: Fast read-only diff review for a single issue - correctness, security, scope creep, verbose comments. Returns only blocking findings.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: sonnet
 color: purple
 ---
 

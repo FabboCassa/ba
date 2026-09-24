@@ -5,10 +5,7 @@ Universal guidelines for AI coding assistants working in this repository (Gemini
 ---
 
 ## 1. Core Philosophy: Terse, Real Proofs, Zero Fluff
-- **Token Efficiency**: No preambles ("Sure!", "I'd be happy to help"), no polite conversational filler, no unsolicited postambles or recap of code just modified.
-- **Lead with Action or Result**: State directly what was done and the verification evidence (max 3-5 lines).
-- **No Unverified Claims**: Never state "all tests pass" without running the verification commands in the current turn.
-- **Comments**: Only comment the non-obvious *WHY* (workarounds, hardware/platform constraints, invariants). Never narrate *WHAT* the code does.
+Follow `templates/terse-rules.md` (token efficiency, comment rules, output format). Never state "all tests pass" without running the verification commands in the current turn.
 
 ---
 

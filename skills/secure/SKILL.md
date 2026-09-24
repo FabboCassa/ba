@@ -27,10 +27,7 @@ Areas = args among `secrets code deps platform` (none → all). `AUTO` = args co
 
 # 1. Secrets & what gets published
 Run `bash $S/sec-scan.sh secrets` (gitleaks on working tree AND full history, redacted; built-in regex fallback if gitleaks missing). Then check yourself:
-- **Tracked files that should never be tracked**: `git ls-files` matching `.env*` (not `.env.example`), `*.pem *.key *.p12 *.pfx *.jks *.keystore *.mobileprovision *.p8 id_rsa* *.tfstate* secrets.json credentials*.json service-account*.json *.sqlite *.db`, `appsettings.*.json`/`local.settings.json` with connection strings or keys, `google-services.json`/`GoogleService-Info.plist` (not secret, but check API key restrictions are documented).
-- **.gitignore / .dockerignore / .npmignore / `files` field** cover the above.
-- **What ships to users is public**: keys in front-end env (`VITE_*`, `NEXT_PUBLIC_*`, `REACT_APP_*`), in mobile code/resources/BuildConfig, in desktop binaries → anything there is readable by anyone. Flag any non-publishable key (server keys, DB creds, signing keys, payment secret keys).
-- **Publish dry runs** (where applicable): `npm pack --dry-run`, `dotnet pack` → list package content, `python -m build` sdist listing, `docker build` context vs `.dockerignore`. Flag unexpected files (tests with creds, .env, source maps with secrets, local DBs).
+- **Tracked files that should never be tracked**: Read `${CLAUDE_SKILL_DIR}/references/tracked-file-patterns.md` for the full checklist of file patterns, ignore coverage, and publish dry-run commands.
 - **GitHub side** (ignore 403/404 silently): `gh api repos/{o}/{r}/secret-scanning/alerts?state=open`; workflows (`.github/workflows/*`): secrets echoed, `pull_request_target` + checkout of PR head, `permissions` missing/too broad, third-party actions not pinned to a SHA.
 Any live secret found → **before anything else** print a short "AZIONE URGENTE" block: which credential type, where, "ruota/revoca la chiave sul provider ora", then continue. Issue for it: label `needs-human` (rotation) + separate `ba` issue for code-side fix (move to env/secret store, add ignore rule, add guard). History cleanup only as an optional, user-approved step listed in the report.
 
@@ -45,15 +42,9 @@ For each vulnerable package: advisory id (GHSA/CVE), severity, fixed version, di
 Also flag: abandoned packages (no release > 2 years + known issues), typosquat-looking names, install scripts from unknown packages.
 
 # 4. Platform compliance (`web=allow` only; otherwise list as "not checked")
-Research with WebSearch/WebFetch **restricted to official domains**. Allowed:
-`developer.android.com support.google.com/googleplay play.google.com/console android.com/security source.android.com developer.apple.com (incl. /app-store/review/guidelines) support.apple.com/security learn.microsoft.com developer.chrome.com developer.mozilla.org web.dev w3.org owasp.org (ASVS, MASVS, Top 10, cheat sheets) nvd.nist.gov cve.org cisa.gov github.com/advisories osv.dev` + the official site/repo of each dependency or framework in use (e.g. nodejs.org, dotnet.microsoft.com, python.org, docs.flutter.dev, reactnative.dev, nextjs.org, the package's own GitHub org).
-Anything only found on other sites → not used (optionally listed as "unverified, not acted on").
+Research with WebSearch/WebFetch **restricted to official domains**: Read `${CLAUDE_SKILL_DIR}/references/allowed-domains.md` for the full list.
 Cache: `.ba/security/requirements-<platform>.md` with, for each requirement: text, **source URL, fetch date**. Reuse if < 30 days old, else refresh. Also `.ba/security/advisories-<date>.md` for the newest relevant threats (last 90 days) for the stack in use.
-What to verify per platform (always fetch the CURRENT values, never assume them):
-- android: required targetSdk level and deadline, 64-bit / page-size requirements, permissions policy (sensitive permissions need declared use), Data safety form consistency, network security config, exported components, account-deletion requirement if accounts exist, signing (Play App Signing, keystore not in repo).
-- ios: required SDK/Xcode for submissions, privacy manifest (PrivacyInfo.xcprivacy) + required-reason APIs, App Tracking Transparency, ATS exceptions, account deletion, Sign in with Apple rule when third-party login exists, purpose strings for each permission.
-- web: HTTPS/HSTS, CSP, security headers, cookie flags (Secure/HttpOnly/SameSite), CORS, auth per OWASP ASVS level chosen (ask once, default L1), dependency integrity (SRI for CDN), privacy/cookie consent if analytics.
-- windows/desktop, extension, registry packages, containers: the equivalent official policy (e.g. Chrome Web Store program policies + Manifest V3, NuGet/npm package signing & provenance, container base image support status).
+What to verify per platform: Read `${CLAUDE_SKILL_DIR}/references/platform-checklists.md` for the full per-platform checklist (android, ios, web, desktop/extension/registry/containers).
 Each gap = finding with Kind `config` or `feature` and the source URL in the finding.
 
 # 5. Report + approval

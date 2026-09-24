@@ -24,14 +24,8 @@ Areas = args among `tests arch code perf` (none → all). `SLOW` = `slow=N` seco
 1. `bash $S/test-times.sh --slow $SLOW` → reads existing reports (junit/trx/go json, CI-style paths). No reports:
    - try latest CI run: `gh run list -L 5 --json databaseId,conclusion,name` then `gh run download <id> -D .ba/logs/ci` and re-run the script with `--dir .ba/logs/ci`;
    - still nothing → need a measured run: `bash $S/test-times.sh --run --slow $SLOW` (writes reports to `.ba/logs/`). If the suite is likely long (many integration dirs, previous logs, user said so) and not `AUTO`/`run-tests`: ask once "La suite può durare a lungo, la lancio ora?" (Consigliato: sì, in background). In `AUTO` run it.
-2. Output of the script = slow tests + slow files. For each slow item, dispatch **ba:auditor** (mode `tests`, max 10 items per call) with test file paths + durations. It classifies the cause and proposes a split:
-   - `sleep/poll` → fake clock / await condition;
-   - `setup-per-test` (DB migrate, container, app boot) → shared fixture per class/collection, transaction rollback;
-   - `real-io` (network, disk, external service) → boundary fake + one contract test kept in `slow` tier;
-   - `data-volume` / `combinatorial` → representative cases + property-based sampling with fixed seed, full matrix in `slow` tier;
-   - `mega-test` (one test = many scenarios) → one test per scenario (logical split, same assertions);
-   - `serial` → enable safe parallelism (isolated state).
-   Also propose **tiers**: fast (PR gate) vs `slow` category (nightly CI job that still runs everything). Tag syntax of the repo's framework (`[Trait("Category","Slow")]`, `@pytest.mark.slow`, separate vitest/jest project or config for JS, `//go:build slow`, `@Tag("slow")`).
+2. Output of the script = slow tests + slow files. For each slow item, dispatch **ba:auditor** (mode `tests`, max 10 items per call) with test file paths + durations. It classifies the cause and proposes a split per `${CLAUDE_SKILL_DIR}/references/test-classifications.md`.
+   Also propose **tiers**: fast (PR gate) vs `slow` category (nightly CI job that still runs everything). Tag syntax per framework is in the same reference file.
 3. Issue Kind = `test-split`. Acceptance always includes: same or more test ids and assertions; slowest test < SLOW s; file < 5×SLOW s; full suite (all tiers) still green; slow tier wired into CI.
 
 # 2. Architecture
@@ -39,14 +33,12 @@ Areas = args among `tests arch code perf` (none → all). `SLOW` = `slow=N` seco
 2. Else **ba:auditor** (mode `arch-detect`): folder names, project/module graph, import directions, frameworks → returns hypothesis (Layered/MVC, Clean, Hexagonal, Vertical slice, MVVM, MVI, feature modules, monorepo packages, micro-services…) + confidence + 3-5 evidence lines + main alternatives.
 3. Ask with AskUserQuestion (skip in `AUTO`): hypothesis first `(Consigliato)`, then alternatives; a second question for rules if ambiguous (e.g. "Il dominio può dipendere da EF/ORM?"). Write `docs/architecture.md` from `${CLAUDE_SKILL_DIR}/../../templates/architecture.md`, `Status: confirmed`.
    `AUTO` without a confirmed architecture → report the hypothesis only, create NO arch issues (never refactor toward an unconfirmed architecture).
-4. **ba:auditor** (mode `arch-check`) with the rules: dependency direction violations, cycles, logic in the wrong layer (e.g. SQL in controllers, UI in domain), god classes/files (> ~500 lines or > ~15 deps), duplicated cross-cutting code. Prefer tools when present: dependency-cruiser / madge (JS/TS), NetArchTest or ArchUnitNET (.NET), ArchUnit (JVM), Konsist (Kotlin), import-linter (Python), go-arch-lint (Go).
+4. **ba:auditor** (mode `arch-check`) with the rules: dependency direction violations, cycles, logic in the wrong layer, god classes/files (> ~500 lines or > ~15 deps), duplicated cross-cutting code. Prefer tools per stack — see `${CLAUDE_SKILL_DIR}/references/tools-by-language.md`.
 5. First arch issue (if none exists) = **architecture test** encoding the rules (Kind `feature`: it is red on current violations, green after fixes → real red→green). Violation fixes: Kind `refactor`, depend on it.
 
 # 3. Code — dead, duplicated, improvable
-**ba:auditor** (mode `code`). Tools when available, else careful Grep:
-- unused code/exports/deps: knip (JS/TS), vulture + ruff (Python), IDE0051/IDE0052/CA1822 analyzers (`dotnet build -p:EnforceCodeStyleInBuild=true`), staticcheck + `deadcode` (Go), clippy + cargo-machete (Rust), PMD (Java);
-- duplication: jscpd (any language);
-- complexity hot spots: longest/most-branched functions in files changed often (`git log --format= --name-only | sort | uniq -c | sort -rn | head -30`).
+**ba:auditor** (mode `code`). Tools per stack in `${CLAUDE_SKILL_DIR}/references/tools-by-language.md`, else careful Grep.
+Complexity hot spots: longest/most-branched functions in files changed often (`git log --format= --name-only | sort | uniq -c | sort -rn | head -30`).
 Rules: code reachable via reflection/DI/serialization/public API of a library is NOT dead without proof (grep registrations, config, attribute usage). Kind `refactor` (dead code, duplication, simplification).
 
 # 4. Performance
