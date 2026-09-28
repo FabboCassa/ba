@@ -7,6 +7,8 @@ CMD="$1"; shift
 [[ $# -gt 0 ]] || { echo "usage: prove-test.sh <test-cmd> <test-file>..."; exit 2; }
 TESTS=("$@")
 for t in "${TESTS[@]}"; do [[ -e "$t" ]] || { echo "missing test file: $t"; exit 2; }; done
+FULL="$(bash "$(dirname "${BASH_SOURCE[0]}")/detect.sh" . 2>/dev/null | sed -n 's/^TEST=//p')"
+[[ -n "$FULL" && "$CMD" == "$FULL" ]] && echo "WARN: full suite runs twice (RED+GREEN) - pass a per-file/filtered test command"
 
 mapfile -t IMPL < <( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u | grep -vxF -f <(printf '%s\n' "${TESTS[@]}") | grep -v '^\.ba/' || true)
 [[ ${#IMPL[@]} -gt 0 ]] || { echo "NO IMPLEMENTATION CHANGES found besides tests"; exit 3; }

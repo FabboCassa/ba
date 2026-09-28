@@ -148,10 +148,10 @@ Dopo l'OK:
 Cosa succede, in ordine:
 | Passo | Chi | Cosa |
 |---|---|---|
-| Preflight | skill | issue aperta? dipendenze chiuse? working tree pulito? crea `feat/14-add-duedate-field` da `origin/main`, lancia `gate.sh`: se la base è già rotta si ferma |
+| Preflight | skill | issue aperta? dipendenze chiuse? working tree pulito? crea `feat/14-add-duedate-field` da `origin/main`, lancia `gate.sh --cached` (saltato se quel commit base è già passato): se la base è già rotta si ferma |
 | Test prima | agente `implementer` | scrive `src/todo.test.ts` (un test per ogni criterio), verifica che fallisca |
-| Codice | agente `implementer` | implementazione minima, poi build + lint + tutti i test |
-| Prova | agente `verifier` | `prove-test.sh`: senza implementazione il test **deve fallire**, con implementazione **deve passare**; poi `gate.sh`; poi controlla che ogni criterio abbia un'asserzione e che nessun test sia saltato |
+| Codice | agente `implementer` | implementazione minima, poi build + solo i test toccati (filtrati) |
+| Prova | agente `verifier` | `prove-test.sh` sui soli test nuovi (comando filtrato): senza implementazione il test **deve fallire**, con implementazione **deve passare**; poi `gate.sh` (unica suite completa del tentativo); poi controlla che ogni criterio abbia un'asserzione e che nessun test sia saltato |
 | Review | agente `reviewer` | solo problemi bloccanti: bug, sicurezza, modifiche fuori scope, commenti inutili |
 | Ship | skill | commit `feat(todo): add dueDate field and validation` + `Closes #14`, push, PR |
 
@@ -321,7 +321,7 @@ gh repo create ba --public --source . --push
 Per i cambi senza nuovo comportamento `scripts/prove-refactor.sh` confronta la suite sulla base (in una copia temporanea fuori dal repo, risultato messo in cache per commit) con quella del branch: nessun test perso, tutto verde, e l'obiettivo del Kind raggiunto.
 
 ## Build sempre
-`scripts/gate.sh` rileva build/lint/test (npm/pnpm/yarn/bun, dotnet, cargo, go, gradle, maven, python, make) e stampa solo le ultime 40 righe degli errori. Override: `.ba/commands.env`
+`scripts/gate.sh` rileva build/lint/test (npm/pnpm/yarn/bun, dotnet, cargo, go, gradle, maven, python, make) e stampa solo le ultime 40 righe degli errori. `--cached`: su working tree pulito salta se lo stesso commit (con gli stessi comandi) è già passato; la cache è condivisa tra i worktree. Override: `.ba/commands.env`
 ```
 BUILD=dotnet build -v q
 TEST=dotnet test -v q
@@ -330,7 +330,7 @@ LINT=
 
 ## Risparmio token
 - Hook `SessionStart` inietta `templates/terse-rules.md` (~350 token): niente preamboli/riepiloghi, commenti solo sul *perché*, letture mirate, log troncati.
-- Implementer/verifier/reviewer/auditor girano come subagenti (`sonnet`): il contesto principale tiene solo i risultati (3 righe per issue, una tabella per audit).
+- Implementer (`opus`), verifier/reviewer/auditor (`sonnet`) girano come subagenti: il contesto principale tiene solo i risultati (3 righe per issue, una tabella per audit).
 - Script bash deterministici per detect/gate/prova test/tempi test/scanner/segreti: zero token LLM.
 
 Nota onesta (dai benchmark di claude-token-efficient e caveman): le regole di stile tagliano l'**output**, non input né ragionamento. Il guadagno reale viene soprattutto da subagenti + log troncati.
