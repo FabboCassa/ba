@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="0.8.1"
+VERSION="0.11.0"
 
 show_help() {
   cat <<EOF
@@ -14,17 +14,29 @@ ba v$VERSION — Multi-AI Terse & Verified Coding Engine
 Usage: ba <command> [options...]
 
 Deterministic Verification Commands:
-  gate [dir] [--only build|test|lint]      Run build, lint, and tests (compact output)
-  detect [dir]                             Detect build, test, and lint commands
+  gate [dir] [options]                     Run build, lint, and tests (compact output)
+                                           Options: [--only build|test|lint] [--cached] [--tier fast|full] [--timeout <sec>]
+  detect [dir]                             Detect build, test, and fast/full test tier commands
   prove-test "<test-cmd>" <files...>       Prove test validity via RED->GREEN rollback
   prove-refactor <base> <kind> [options]   Prove behavior preserved for refactor/perf/test-split
+                                           Options: [--slow <sec>] [--bench <cmd>] [--target <%>] [--timeout <sec>] [--tier fast|full]
   scan secrets|code|deps [options]         Scan secrets, vulnerable code, or dependencies
   secret-guard [options]                   Secret leak prevention check or hook installer
   test-times [options]                     Analyze test durations and bottleneck tests
+                                           Options: [--run] [--slow <sec>] [--timeout <sec>] [--tier fast|full] [--dir <dir>]
 
 Multi-AI Setup & Adapters:
   init <platform>                          Initialize adapter for target AI platform:
                                            (gemini, cursor, windsurf, copilot, roo, cline, mcp, all)
+
+AI Workflow Skills:
+  /ba:architect <idea>                     Full system architecture, C4 diagrams, ERD, hosting & cloud topology
+  /ba:spec <idea>                          Interview user until feature is fully specified -> docs/specs/<slug>.md
+  /ba:issues <spec|audit>                  Break spec/audit into small GitHub issues with proof kind
+  /ba:implement <n>                        Implement one issue test-first with real proof
+  /ba:auto [spec] [merge]                  Fully autonomous execution of all issues
+  /ba:optimize [tests|arch|code|perf]      Audit for slow tests (tiering), arch drift, dead code, perf
+  /ba:secure [secrets|code|deps|platform]  Security audit across code, dependencies, and cloud platforms
 
 General:
   version                                  Print version

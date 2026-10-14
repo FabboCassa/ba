@@ -13,7 +13,7 @@ Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 - `KIND` = `Kind:` line of the body (missing → `feature`).
 - Deps (from body or `.ba/plan.json`) must be merged/closed; else stop and name them.
 - Clean tree required. Base = plan.base or default branch. `git fetch -q && git switch -c feat/$ARGUMENTS-<slug> origin/<base>` (reuse branch if exists). Prefix: `fix/` for security/secret/dep-upgrade, `refactor/` for refactor/test-split, `perf/` for perf.
-- `bash $S/gate.sh . --cached` on the fresh branch (skips if this base commit already passed). If already red: stop, report — never build on a broken base.
+- `bash $S/gate.sh . --cached --tier fast` on the fresh branch (skips if this base commit already passed). If already red: stop, report — never build on a broken base.
 
 ## 1. Loop (max 3 attempts)
 For attempt k:
@@ -26,7 +26,7 @@ b. Delegate to agent **ba:verifier** with the same issue, `KIND`, base ref and r
    - `dep-upgrade`: `bash $S/sec-scan.sh deps --id <Advisory>` → RESOLVED;
    - `secret`: `bash $S/sec-scan.sh secrets --tree` clean for the files + prove-test on the config-loading test;
    - `config`: the acceptance check commands/tests pass, and fail on `origin/<base>` (prove-test when it is a test).
-   Proof runs only the new/touched tests (filtered command). Then always `bash $S/gate.sh .` — the only full build + lint + suite run of the attempt — and the acceptance-to-assertion check.
+   Proof runs only the new/touched tests (filtered command). During the loop, gate runs `bash $S/gate.sh . --tier fast` (prevents hour-long hangs). The full suite (`bash $S/gate.sh . --tier full`) runs once when all checks pass before shipping, plus the acceptance-to-assertion check.
    Returns `PASS` or `FAIL: <reason>` + evidence (≤40 log lines).
 c. PASS → go to 2.
    FAIL → append to `.ba/runs/$ARGUMENTS.md`:

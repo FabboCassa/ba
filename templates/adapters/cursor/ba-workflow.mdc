@@ -14,5 +14,5 @@ alwaysApply: true
 1. Identify commands: `bash scripts/detect.sh .`
 2. Test-First (TDD): write the test, run it to verify failure, implement code, verify pass.
 3. Test Proof: run `bash scripts/prove-test.sh "<test-cmd>" <test-files...>` to eliminate fake tests.
-4. Gate: always run `bash scripts/gate.sh .` before finishing. All checks must be green.
+4. Gate: run `bash scripts/gate.sh . --tier fast` during dev, and `--tier full` before final shipping. All checks must be green.
 5. Secrets: never include API keys, passwords, or credentials in commits.

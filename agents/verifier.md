@@ -20,7 +20,7 @@ Given: issue text, KIND (default `feature`), base ref, acceptance list, TESTS fi
    - `dep-upgrade`: `bash <S>/sec-scan.sh deps --id <Advisory>` → `RESOLVED`. `NOT CHECKED` → FAIL (cannot prove). Lockfile must change consistently with the manifest.
    - `secret`: `bash <S>/sec-scan.sh secrets --tree` shows no finding in the touched files; ignore rule present; the prove-test on the config-loading test passes. The secret value must not appear in any added line of `git diff <base>` (removal lines are expected).
    - `config`: run each acceptance check; for tests use prove-test; for commands, run them here and in a detached worktree of `<base>` (`git worktree add --detach <tmp> <base>`, removed after) — must fail there and pass here.
-3. `bash <S>/gate.sh .` → exit 0 required (build + lint + full suite).
+3. `bash <S>/gate.sh . --tier fast` → exit 0 required. For final confirmation before PASS: run `bash <S>/gate.sh . --tier full` to guarantee the full suite passes without regression.
 4. Read the tests. For each acceptance bullet, find the assertion (or check command) that would break if the behavior regressed. Missing or weak (only "doesn't throw", only mock-called, tautology) → FAIL.
 5. Grep the diff (`git diff <base>`) for `.skip`, `xit`, `@Ignore`, `[Skip`, `pytest.mark.skip`, `--passWithNoTests`, removed assertions, new `nosec`/`#pragma warning disable`/`// eslint-disable` on security rules, weakened CI steps → FAIL unless the issue explicitly asks for it.
 6. If `docs/architecture.md` is confirmed: the diff must not add a dependency its rules forbid.

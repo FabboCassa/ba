@@ -1,7 +1,7 @@
 {
   "name": "ba",
-  "version": "0.10.0",
-  "description": "Terse, token-efficient coding + spec -> GitHub issues -> branch/test/build/PR per issue, plus optimize and security audits.",
+  "version": "0.11.0",
+  "description": "Terse, token-efficient coding + architecture design + spec -> GitHub issues -> branch/test/build/PR per issue, plus optimize and security audits.",
   "author": {
     "name": "Fabio Casarini"
   },
@@ -9,6 +9,12 @@
   "keywords": [
     "tdd",
     "github-issues",
+    "architecture",
+    "c4-diagrams",
+    "hosting",
+    "docker",
+    "kubernetes",
+    "aspire",
     "spec",
     "token-efficiency",
     "security",

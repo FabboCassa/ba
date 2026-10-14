@@ -16,7 +16,7 @@ When implementing features or bug fixes, keep the writer mindset distinct from t
    - Focus on implementing the specific task/issue.
    - For new behavior (`feature`) or security exploit fixes (`security`): write the test first (RED), then the minimal implementation (GREEN).
    - For `refactor`, `perf`, or `test-split`: maintain existing observable behavior and keep all tests passing without weakening assertions.
-   - Run `bash scripts/gate.sh .` to confirm build, lint, and tests pass before declaring done.
+   - Run `bash scripts/gate.sh . --tier fast` to confirm build, lint, and fast tests pass before declaring done.
 
 2. **Checker (`verifier`)**:
    - Independent verification: assume the code might have hidden defects or fake tests until proven otherwise.
@@ -24,8 +24,8 @@ When implementing features or bug fixes, keep the writer mindset distinct from t
      - Temporarily reverts the implementation to ensure the new tests genuinely fail (RED ok).
      - Restores the implementation to ensure the tests pass (GREEN ok).
      - Detects tautological/fake tests (`FAKE TEST`).
-   - Run `bash scripts/prove-refactor.sh <base-ref> <kind>` for refactoring/perf.
-   - Run `bash scripts/gate.sh .` for full compilation, linting, and whole-suite test runs.
+   - Run `bash scripts/prove-refactor.sh <base-ref> <kind> [--tier fast|full]` for refactoring/perf.
+   - Run `bash scripts/gate.sh . --tier fast` during iterations, and `bash scripts/gate.sh . --tier full` for final whole-suite pass before ship.
 
 3. **Diff Reviewer (`reviewer`)**:
    - Inspects `git diff <base>...HEAD`.
@@ -43,13 +43,13 @@ All AI agents can execute these bash scripts deterministically:
 
 | Script | Purpose | Command |
 |---|---|---|
-| `detect.sh` | Detects project build, test, and lint commands | `bash scripts/detect.sh .` |
-| `gate.sh` | Runs build + lint + test, printing compact logs (last 40 lines on error) | `bash scripts/gate.sh .` |
+| `detect.sh` | Detects project build, test, and fast/full tier commands | `bash scripts/detect.sh .` |
+| `gate.sh` | Runs build + lint + test (supports `--tier fast\|full` and `--timeout <sec>`) | `bash scripts/gate.sh . --tier fast` |
 | `prove-test.sh` | Proves tests are real via RED->GREEN implementation rollback | `bash scripts/prove-test.sh "<test-cmd>" <test-files...>` |
 | `prove-refactor.sh` | Proves refactoring/perf preserved all tests without regressions | `bash scripts/prove-refactor.sh origin/main refactor` |
 | `sec-scan.sh` | Scans secrets (git tree + history), vulnerable code, and deps | `bash scripts/sec-scan.sh secrets` / `code` / `deps` |
 | `secret-guard.sh` | Prevents accidental commits or publishes containing secret keys | `bash scripts/secret-guard.sh` |
-| `test-times.sh` | Analyzes test suite runtimes and highlights slow bottlenecks | `bash scripts/test-times.sh --slow 60` |
+| `test-times.sh` | Analyzes test suite runtimes, bottlenecks, with timeout killing | `bash scripts/test-times.sh --slow 60 --timeout 600` |
 
 ---
 

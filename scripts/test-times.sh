@@ -1,43 +1,103 @@
 #!/usr/bin/env bash
 # Per-test durations from existing reports (JUnit XML, .trx, go test -json, jest json),
 # or from a measured run with --run. Prints slowest tests/files and totals.
-# Usage: test-times.sh [--run] [--dir <path>] [--slow <sec>] [--top <n>] [--out <tsv>]
+# Usage: test-times.sh [--run] [--dir <path>] [--slow <sec>] [--top <n>] [--out <tsv>] [--timeout <sec>] [--tier fast|full]
 # TSV out columns: seconds  status  file_or_class  test_name
 set -uo pipefail
-RUN=0; DIR=.; SLOW=60; TOP=30; OUT=.ba/logs/test-times.tsv
+RUN=0; DIR=.; SLOW=60; TOP=30; OUT=.ba/logs/test-times.tsv; TIMEOUT="${BA_TEST_TIMEOUT:-600}"; TIER="full"
 while [[ $# -gt 0 ]]; do case "$1" in
   --run) RUN=1;; --dir) DIR="$2"; shift;; --slow) SLOW="$2"; shift;;
-  --top) TOP="$2"; shift;; --out) OUT="$2"; shift;; *) echo "unknown arg $1"; exit 2;;
+  --top) TOP="$2"; shift;; --out) OUT="$2"; shift;;
+  --timeout) TIMEOUT="$2"; shift;; --tier) TIER="$2"; shift;;
+  *) echo "unknown arg $1"; exit 2;;
 esac; shift; done
 
-PY=$(command -v python3 || command -v python || command -v py || true)
+PY=""
+for p in python py python3; do
+  if command -v "$p" >/dev/null 2>&1 && "$p" -c 'import sys' >/dev/null 2>&1; then
+    PY="$p"; break
+  fi
+done
 [[ -n "$PY" ]] || { echo "NEED python3 to parse test reports"; exit 2; }
 mkdir -p .ba/logs "$(dirname "$OUT")"
 
 if [[ $RUN == 1 ]]; then
   R=.ba/logs/reports; rm -rf "$R"; mkdir -p "$R"; START=$(date +%s)
+  CMD=""
   if [[ -n "$(git ls-files '*.sln' '*.slnx' '*.csproj' 2>/dev/null | head -1)" ]]; then
-    dotnet test --logger "trx;LogFilePrefix=ba" --results-directory "$R" > .ba/logs/test-run.log 2>&1
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="dotnet test --logger \"trx;LogFilePrefix=ba\" --results-directory \"$R\" --filter \"Category!=Slow&Category!=Integration\""
+    else
+      CMD="dotnet test --logger \"trx;LogFilePrefix=ba\" --results-directory \"$R\""
+    fi
   elif [[ -f package.json ]] && grep -q '"vitest"' package.json; then
-    npx vitest run --reporter=junit --outputFile="$R/junit.xml" > .ba/logs/test-run.log 2>&1
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="npx vitest run --reporter=junit --outputFile=\"$R/junit.xml\" --exclude='**/*.e2e.*' --exclude='**/*.integration.*'"
+    else
+      CMD="npx vitest run --reporter=junit --outputFile=\"$R/junit.xml\""
+    fi
   elif [[ -f package.json ]] && grep -q '"jest"' package.json; then
-    npx jest --json --outputFile="$R/jest.json" > .ba/logs/test-run.log 2>&1
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="npx jest --json --outputFile=\"$R/jest.json\" --testPathIgnorePatterns='e2e|integration'"
+    else
+      CMD="npx jest --json --outputFile=\"$R/jest.json\""
+    fi
   elif [[ -f pyproject.toml || -f pytest.ini || -f setup.cfg || -d tests ]] && command -v pytest >/dev/null; then
-    pytest -q --junitxml="$R/junit.xml" > .ba/logs/test-run.log 2>&1
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="pytest -q -m 'not slow and not integration' --junitxml=\"$R/junit.xml\""
+    else
+      CMD="pytest -q --junitxml=\"$R/junit.xml\""
+    fi
   elif [[ -f go.mod ]]; then
-    go test -json ./... > "$R/go-test.json" 2>.ba/logs/test-run.log
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="go test -short -json ./... > \"$R/go-test.json\""
+    else
+      CMD="go test -json ./... > \"$R/go-test.json\""
+    fi
   elif [[ -f gradlew ]]; then
-    ./gradlew test > .ba/logs/test-run.log 2>&1
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="./gradlew test -x integrationTest"
+    else
+      CMD="./gradlew test"
+    fi
   elif [[ -f pom.xml ]]; then
-    mvn -q test > .ba/logs/test-run.log 2>&1
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="mvn -q test -Dtest='!*IT,*Test'"
+    else
+      CMD="mvn -q test"
+    fi
   elif [[ -f Cargo.toml ]] && command -v cargo-nextest >/dev/null; then
-    cargo nextest run --message-format libtest-json > "$R/nextest.json" 2>.ba/logs/test-run.log || true
+    if [[ "$TIER" == "fast" ]]; then
+      CMD="cargo nextest run --lib --message-format libtest-json > \"$R/nextest.json\""
+    else
+      CMD="cargo nextest run --message-format libtest-json > \"$R/nextest.json\""
+    fi
   else
     echo "NO RUNNER with per-test timing detected. Configure a JUnit reporter and pass --dir."; exit 3
   fi
-  RC=$?
-  echo "run exit=$RC wall=$(( $(date +%s) - START ))s log=.ba/logs/test-run.log"
-  [[ -n "$(ls -A "$R")" ]] && DIR="$R"   # gradle/maven: reports stay in build/ or target/, scan repo
+
+  # Execute command with timeout protection
+  RC=0
+  "$PY" - "$CMD" "$TIMEOUT" ".ba/logs/test-run.log" <<'PYEOF' || RC=$?
+import sys, subprocess
+cmd, to, logpath = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+with open(logpath, 'w', encoding='utf-8') as f:
+    try:
+        proc = subprocess.run(cmd, shell=True, stdout=f, stderr=subprocess.STDOUT, timeout=to if to > 0 else None)
+        sys.exit(proc.returncode)
+    except subprocess.TimeoutExpired:
+        f.write(f"\n[test-times] TIMEOUT: Test execution exceeded {to}s and was killed.\n")
+        f.write("[test-times] Tip: Use --tier fast, tag slow tests, or split them with /ba:optimize.\n")
+        sys.exit(124)
+PYEOF
+
+  WALL=$(( $(date +%s) - START ))
+  if [[ $RC -eq 124 ]]; then
+    echo "run TIMEOUT after ${WALL}s (limit ${TIMEOUT}s) log=.ba/logs/test-run.log"
+  else
+    echo "run exit=$RC tier=$TIER wall=${WALL}s log=.ba/logs/test-run.log"
+  fi
+  [[ -n "$(ls -A "$R" 2>/dev/null)" ]] && DIR="$R"   # gradle/maven: reports stay in build/ or target/, scan repo
 fi
 
 "$PY" - "$DIR" "$SLOW" "$TOP" "$OUT" <<'PYEOF'
@@ -95,6 +155,8 @@ agg = defaultdict(lambda: [0.0, 0])
 for r in rows: agg[r[2]][0] += r[0]; agg[r[2]][1] += 1
 total = sum(r[0] for r in rows)
 print(f'TESTS {len(rows)}  SUM {total:.0f}s ({total/60:.1f} min, sequential sum)  reports {len(files)}  tsv {out}')
+if total > 600:
+    print(f'BOTTLENECK WARNING: Total test sum {total/60:.1f} min exceeds fast dev target (10 min). Set up TEST_FAST tier.')
 print(f'SLOW TESTS (> {slow:.0f}s): {sum(1 for r in rows if r[0] > slow)}')
 for r in rows[:top]:
     if r[0] <= slow and r is not rows[0]: break

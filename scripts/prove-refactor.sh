@@ -9,27 +9,34 @@
 #   "<class> :: <name>" per line, in .ba/removed-tests.txt - the verifier judges each one.
 set -uo pipefail
 BASE="$1"; KIND="$2"; shift 2
-SLOW=60; BENCH=""; TARGET=0
+SLOW=60; BENCH=""; TARGET=0; TIMEOUT="${BA_TEST_TIMEOUT:-600}"; TIER="full"
 while [[ $# -gt 0 ]]; do case "$1" in
   --slow) SLOW="$2"; shift;; --bench) BENCH="$2"; shift;; --target) TARGET="$2"; shift;;
+  --timeout) TIMEOUT="$2"; shift;; --tier) TIER="$2"; shift;;
   *) echo "unknown arg $1"; exit 2;; esac; shift; done
 S="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(git rev-parse --show-toplevel)"; cd "$ROOT"
 SHA=$(git rev-parse "$BASE") || exit 2
 mkdir -p .ba/cache .ba/logs
-BASE_TSV=".ba/cache/tests-$SHA.tsv"
+BASE_TSV=".ba/cache/tests-$SHA-$TIER.tsv"
 
 if [[ ! -s $BASE_TSV ]]; then
   WT="$(dirname "$ROOT")/$(basename "$ROOT")-ba/base-${SHA:0:10}"
   [[ -d $WT ]] || git worktree add -q --detach "$WT" "$SHA" || exit 2
-  ( cd "$WT" && bash "$S/test-times.sh" --run --slow "$SLOW" --out "$ROOT/$BASE_TSV" ) > .ba/logs/refactor-base.log 2>&1
-  echo "base suite measured on ${SHA:0:10}"
+  ( cd "$WT" && bash "$S/test-times.sh" --run --slow "$SLOW" --timeout "$TIMEOUT" --tier "$TIER" --out "$ROOT/$BASE_TSV" ) > .ba/logs/refactor-base.log 2>&1
+  echo "base suite measured on ${SHA:0:10} (tier=$TIER)"
   [[ $KIND == perf ]] || git worktree remove --force "$WT"
 fi
-bash "$S/test-times.sh" --run --slow "$SLOW" --out .ba/logs/tests-head.tsv > .ba/logs/refactor-head.log 2>&1
+bash "$S/test-times.sh" --run --slow "$SLOW" --timeout "$TIMEOUT" --tier "$TIER" --out .ba/logs/tests-head.tsv > .ba/logs/refactor-head.log 2>&1
 
 FAIL=0
-PY=$(command -v python3 || command -v python || command -v py)
+PY=""
+for p in python py python3; do
+  if command -v "$p" >/dev/null 2>&1 && "$p" -c 'import sys' >/dev/null 2>&1; then
+    PY="$p"; break
+  fi
+done
+[[ -n "$PY" ]] || { echo "NEED python to evaluate test diffs"; exit 2; }
 "$PY" - "$BASE_TSV" .ba/logs/tests-head.tsv "$KIND" "$SLOW" <<'PYEOF' || FAIL=1
 import sys, os
 b, h, kind, slow = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])

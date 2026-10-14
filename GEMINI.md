@@ -12,16 +12,17 @@ This repository uses **ba (BetterAI)**: token-efficient, verified software devel
    - **Checker (`verifier`)**:
      - Never takes "tests pass" on faith.
      - Runs `bash scripts/prove-test.sh "<test-cmd>" <test-files...>` to confirm the tests fail with implementation reverted (RED) and pass with implementation applied (GREEN).
-     - Runs `bash scripts/gate.sh .` to guarantee full build, lint, and test pass.
+     - Runs `bash scripts/gate.sh . --tier fast` during loop and `bash scripts/gate.sh . --tier full` to guarantee full build, lint, and test pass before shipping.
 
 3. **Deterministic Verification Commands**:
    - Stack Detection: `bash scripts/detect.sh .`
-   - Full Gate (Build + Lint + Test): `bash scripts/gate.sh .`
+   - Fast Gate (Dev loop): `bash scripts/gate.sh . --tier fast`
+   - Full Gate (Pre-PR / Full suite): `bash scripts/gate.sh . --tier full`
    - Real Test Proof: `bash scripts/prove-test.sh "<test-cmd>" <test-files...>`
-   - Refactor / Perf Proof: `bash scripts/prove-refactor.sh origin/main <kind>`
+   - Refactor / Perf Proof: `bash scripts/prove-refactor.sh origin/main <kind> [--tier fast|full]`
    - Security Audit: `bash scripts/sec-scan.sh secrets` / `code` / `deps`
    - Secret Guard: `bash scripts/secret-guard.sh`
-   - Test Times: `bash scripts/test-times.sh --slow 60`
+   - Test Times & Bottlenecks: `bash scripts/test-times.sh --slow 60 --timeout 600`
 
 4. **Safety & Zero Leaks**:
    - Never commit `.env`, keys, credentials, or secrets.

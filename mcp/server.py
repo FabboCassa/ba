@@ -13,7 +13,7 @@ from pathlib import Path
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "ba-mcp"
-SERVER_VERSION = "0.8.1"
+SERVER_VERSION = "0.11.0"
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT_DIR / "scripts"
@@ -26,13 +26,15 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "dir": {"type": "string", "description": "Target repository directory (default: current directory)"},
-                "only": {"type": "string", "enum": ["build", "lint", "test"], "description": "Optional step filter"}
+                "only": {"type": "string", "enum": ["build", "lint", "test"], "description": "Optional step filter"},
+                "tier": {"type": "string", "enum": ["fast", "full"], "description": "Test tier: fast (default, runs TEST_FAST) or full (runs entire suite)"},
+                "timeout": {"type": "number", "description": "Maximum execution timeout in seconds (default: 600)"}
             }
         }
     },
     {
         "name": "ba_detect",
-        "description": "Detect build, test, and lint commands for the project.",
+        "description": "Detect build, test, and fast/full test tier commands for the project.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -62,7 +64,9 @@ TOOLS = [
                 "kind": {"type": "string", "enum": ["refactor", "perf", "test-split"], "description": "Kind of change"},
                 "slow": {"type": "number", "description": "Threshold for slow tests in seconds (default: 60)"},
                 "bench": {"type": "string", "description": "Benchmark command printing 'BENCH <number>' (for perf)"},
-                "target": {"type": "number", "description": "Target percentage improvement (for perf)"}
+                "target": {"type": "number", "description": "Target percentage improvement (for perf)"},
+                "tier": {"type": "string", "enum": ["fast", "full"], "description": "Test tier: fast or full (default: full)"},
+                "timeout": {"type": "number", "description": "Execution timeout in seconds (default: 600)"}
             },
             "required": ["base_ref", "kind"]
         }
@@ -82,13 +86,15 @@ TOOLS = [
     },
     {
         "name": "ba_test_times",
-        "description": "Analyze test suite execution durations and identify slow bottleneck tests.",
+        "description": "Analyze test suite execution durations and identify slow bottleneck tests with timeout protection.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "slow": {"type": "number", "description": "Threshold in seconds for slow tests (default: 60)"},
                 "run_suite": {"type": "boolean", "description": "Execute a measured test run if reports are missing"},
-                "dir": {"type": "string", "description": "Directory containing test reports"}
+                "dir": {"type": "string", "description": "Directory containing test reports"},
+                "tier": {"type": "string", "enum": ["fast", "full"], "description": "Test tier to execute if run_suite is true"},
+                "timeout": {"type": "number", "description": "Timeout in seconds for test execution (default: 600)"}
             }
         }
     }
@@ -131,6 +137,10 @@ def handle_call_tool(tool_name, arguments):
         args = [cwd]
         if arguments.get("only"):
             args.extend(["--only", arguments["only"]])
+        if arguments.get("tier"):
+            args.extend(["--tier", arguments["tier"]])
+        if arguments.get("timeout"):
+            args.extend(["--timeout", str(arguments["timeout"])])
         rc, out = run_bash_script("gate.sh", args, cwd=cwd)
         return rc, out
 
@@ -154,6 +164,10 @@ def handle_call_tool(tool_name, arguments):
             args.extend(["--bench", arguments["bench"]])
         if "target" in arguments:
             args.extend(["--target", str(arguments["target"])])
+        if "tier" in arguments:
+            args.extend(["--tier", arguments["tier"]])
+        if "timeout" in arguments:
+            args.extend(["--timeout", str(arguments["timeout"])])
         rc, out = run_bash_script("prove-refactor.sh", args, cwd=cwd)
         return rc, out
 
@@ -173,8 +187,12 @@ def handle_call_tool(tool_name, arguments):
             args.append("--run")
         if "slow" in arguments:
             args.extend(["--slow", str(arguments["slow"])])
-        if arguments.get("dir"):
+        if "dir" in arguments:
             args.extend(["--dir", arguments["dir"]])
+        if "tier" in arguments:
+            args.extend(["--tier", arguments["tier"]])
+        if "timeout" in arguments:
+            args.extend(["--timeout", str(arguments["timeout"])])
         rc, out = run_bash_script("test-times.sh", args, cwd=cwd)
         return rc, out
 

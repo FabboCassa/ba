@@ -1,1 +1,5 @@
 .ba/logs/
+.ba/cache/
+.ba/security/
+__pycache__/
+*.pyc

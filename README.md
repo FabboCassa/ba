@@ -80,12 +80,13 @@ Consigliati per `/ba:secure`: `gitleaks`, `osv-scanner`, `semgrep`, `jq`.
 ## Comandi
 | Comando | Cosa fa |
 |---|---|
+| `/ba:architect <idea>` | **Architettura totale**: progetta l'architettura completa di un nuovo software. Ti intervista, propone stack tecnologico, data model, hosting cloud (Azure/AWS/GCP/Hetzner), container & orchestrazione (Docker/K8s/Aspire), IaC (Terraform/Bicep) e genera tutti i diagrammi Mermaid C4 (contesto, container, componenti, ERD, sequenze, deploy). Scrive `docs/architecture/system-architecture.md`, `docs/architecture.md` (confermato) e la spec MVP per `/ba:issues`. |
 | `/ba:spec <idea>` | Ti intervista (risposta consigliata sempre per prima) finché non c'è nulla di aperto. Scrive `docs/specs/<slug>.md`. |
 | `/ba:issues <spec o audit>` | Spezza la spec (o un audit approvato) in issue piccole con dipendenze, criteri di accettazione testabili e **Kind** (come verrà provata). Crea le issue con `gh`. |
-| `/ba:implement <n>` | Branch → test prima → codice → **prova** (red→green, oppure nessuna regressione per refactor/perf, oppure scanner pulito per dipendenze/segreti) → build+lint+test → review → commit `Closes #n` → PR. Max 3 tentativi; ogni fallimento: causa scritta in `.ba/runs/<n>.md` e commento sull'issue. Dopo 3: label `blocked`. |
-| `/ba:auto [spec.md] [merge] [max=N]` | **Autonomo**: fa tutte le issue aperte (o crea le issue dalla spec approvata) senza chiedere nulla finché non ha finito. Uno scrive (`implementer`), altri due controllano (`verifier`, `reviewer`) senza vedere il ragionamento di chi scrive. Issue fallite 3 volte → `blocked` e passa alla successiva. Riprende da dove era rimasto (`.ba/auto.json`). |
+| `/ba:implement <n>` | Branch → test prima → codice → **prova** (red→green, oppure nessuna regressione per refactor/perf, oppure scanner pulito per dipendenze/segreti) → gate veloce (`--tier fast`) nel loop → gate completo (`--tier full`) pre-PR → review → commit `Closes #n` → PR. Max 3 tentativi; ogni fallimento: causa scritta in `.ba/runs/<n>.md` e commento sull'issue. Dopo 3: label `blocked`. |
+| `/ba:auto [spec.md] [merge] [max=N]` | **Autonomo**: fa tutte le issue aperte (o crea le issue dalla spec approvata) senza chiedere nulla finché non ha finito. Uno scrive (`implementer`), altri due controllano (`verifier`, `reviewer`) senza vedere il ragionamento di chi scrive. Loop a test veloci (`--tier fast`), verifica completa pre-merge. Issue fallite 3 volte → `blocked` e passa alla successiva. Riprende da dove era rimasto (`.ba/auto.json`). |
 | `/ba:ship [n...] [merge]` | Esegue `implement` su tutte le issue in ordine di dipendenza (PR impilate se serve). Non fa merge se non lo chiedi. |
-| `/ba:optimize [tests\|arch\|code\|perf] [slow=60] [auto]` | **Audit ottimizzazione**: test troppo lunghi (con proposta di spezzettamento), architettura (la intuisce e te la fa confermare), codice inutile/duplicato, performance. Report → scegli cosa correggere → issue → `ship`/`auto`. |
+| `/ba:optimize [tests\|arch\|code\|perf] [slow=60] [auto]` | **Audit ottimizzazione**: test troppo lunghi (con proposta di spezzettamento e configurazione `TEST_FAST` per evitare suite da 1 ora), architettura (la intuisce e te la fa confermare, o rimanda a `/ba:architect`), codice inutile/duplicato, performance. Report → scegli cosa correggere → issue → `ship`/`auto`. |
 | `/ba:secure [secrets\|code\|deps\|platform] [web=yes\|no] [auto]` | **Audit sicurezza**: segreti in chiaro (anche nella storia git e in quello che pubblichi), vulnerabilità nel codice, librerie con criticità note, requisiti ufficiali della piattaforma (web, Android, iOS…) cercati online solo su siti ufficiali. Report → scegli → issue → `ship`/`auto`. |
 
 ## Esempio completo, passo passo
@@ -100,6 +101,23 @@ cd todo-api && claude              # apri Claude Code nel repo
 /plugin install ba@ba
 ```
 All'avvio della sessione il plugin carica le regole di sintesi: da qui in poi niente preamboli, niente riepiloghi lunghi, commenti solo sul perché.
+
+### 0b. `/ba:architect` — architettura totale (per un nuovo software)
+```
+/ba:architect voglio creare una piattaforma SaaS B2B per gestione flotte con telemetria in tempo reale
+```
+Cosa succede:
+1. Verifica permessi di ricerca online sui soli siti ufficiali dei provider (Azure, AWS, GCP, Hetzner, Docker, K8s, Aspire, Terraform).
+2. Ti intervista in round strutturati (max 3-4 domande con risposta consigliata per prima) su:
+   - **Vision & Scala**: tenant, utenti, volumi, SLA e latenza.
+   - **Stack & Piattaforme**: Web (React/Next.js), Mobile (Flutter/MAUI), Backend (.NET 9/Go/Python/Node), Modular Monolith / Clean Architecture.
+   - **Dati & Code**: PostgreSQL/SQL Server, Redis/Dragonfly, RabbitMQ/Azure Service Bus/Kafka.
+   - **Hosting, Orchestrazione & DevOps (TUTTO)**: Cloud provider, dev locale (.NET Aspire o Docker Compose), produzione (Azure Container Apps / K8s / ECS), IaC (Terraform o Bicep).
+3. Genera la documentazione completa con diagrammi Mermaid renderizzati direttamente in Markdown:
+   - `docs/architecture/system-architecture.md`: diagrammi C4 (contesto, container, componenti), ERD dati, sequenza del flusso critico, topologia cloud/deploy, sizing, ADR.
+   - `docs/architecture.md`: regole formali di dipendenza verificate da `ba:verifier` e `ba:optimize`.
+   - `docs/specs/<slug>-mvp.md`: spec del primo modulo MVP.
+4. Dopo la tua approvazione, ti guida direttamente a `/ba:issues docs/specs/<slug>-mvp.md`.
 
 ### 1. `/ba:spec` — dall'idea alla spec
 ```
@@ -342,10 +360,10 @@ mcp/server.py                                        # Server Model Context Prot
 AGENTS.md, GEMINI.md                                 # Guide standard universali per coding agent
 templates/adapters/{gemini,cursor,windsurf,copilot,cline-roo,mcp} # Template per ogni AI
 .claude-plugin/{plugin,marketplace}.json             # Plugin nativo Claude Code
-skills/{spec,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
+skills/{architect,spec,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
 agents/{implementer,verifier,reviewer,auditor}.md
 scripts/{ba,detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard}.sh
-hooks/hooks.json   templates/{terse-rules,spec,architecture,settings.auto.json,security.yml}
+hooks/hooks.json   templates/{terse-rules,spec,architecture,system-architecture,settings.auto.json,security.yml}
 ```
 Hook da aggiungere in `hooks/hooks.json` (accanto a `SessionStart` e `Stop` già presenti):
 ```json
