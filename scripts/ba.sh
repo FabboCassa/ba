@@ -76,10 +76,16 @@ case "$cmd" in
     target="${1:-help}"
     dest="${2:-.}"
     case "$target" in
-      gemini)
+      gemini|agy)
         cp -v "$ROOT_DIR/templates/adapters/gemini/GEMINI.md" "$dest/GEMINI.md" 2>/dev/null || cp -v "$ROOT_DIR/GEMINI.md" "$dest/GEMINI.md"
         cp -v "$ROOT_DIR/AGENTS.md" "$dest/AGENTS.md"
-        echo "Initialized Gemini / Google Antigravity config."
+        if [[ -d "$HOME/.gemini/config/plugins/ba" ]]; then
+          mkdir -p "$HOME/.gemini/config/plugins/ba/rules" "$HOME/.gemini/config/plugins/ba/agents"
+          cp -f "$ROOT_DIR/GEMINI.md" "$HOME/.gemini/config/plugins/ba/rules/GEMINI.md"
+          cp -f "$ROOT_DIR/AGENTS.md" "$HOME/.gemini/config/plugins/ba/rules/AGENTS.md"
+          cp -f "$ROOT_DIR/templates/adapters/gemini/agents/"*.md "$HOME/.gemini/config/plugins/ba/agents/" 2>/dev/null || true
+        fi
+        echo "Initialized Gemini / Google Antigravity config (pro=Gemini 4 Argon for implementer, flash=Gemini 3.8 Flash for verifier/auditor, flash_lite=Gemini 3.8 Flash Low for reviewer)."
         ;;
       cursor)
         mkdir -p "$dest/.cursor/rules"

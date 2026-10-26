@@ -22,13 +22,18 @@ Progettato per funzionare con **qualsiasi AI**:
 claude --plugin-dir /percorso/ba
 ```
 
-### B. Gemini & Google Antigravity
-Nel tuo progetto:
+### B. Gemini & Google Antigravity (`agy` / `gemini`)
 ```bash
-# Inizializza le istruzioni e regole per Gemini / Antigravity
+# Installa il plugin nativamente in Antigravity CLI (agy)
+agy plugin install /percorso/ba
+
+# Inizializza le regole nel progetto e applica i tier dei modelli Gemini (Argon -> Flash -> Flash-Lite)
 ba init gemini
-# oppure copia AGENTS.md e GEMINI.md nella root del progetto
 ```
+Tiering automatico dei modelli per ottimizzare qualità e consumo token su Gemini / Antigravity:
+- **Orchestrator & Writer (`ba:implementer`)**: **Gemini 4 Argon (High / Medium)** (`model: pro` / `gemini-3.1-pro-preview` su Gemini CLI) — il migliore per architettura, TDD e scrittura codice.
+- **Checker (`ba:verifier`) & Auditor (`ba:auditor`)**: **Gemini 3.8 Flash (Medium)** (`model: flash` / `gemini-3.8-flash`) — esegue gli script deterministici (`prove-test.sh`, `gate.sh`) e verifica le asserzioni a una frazione del costo in token.
+- **Diff Reviewer (`ba:reviewer`)**: **Gemini 3.8 Flash (Low) / Flash-Lite** (`model: flash_lite` / `gemini-3.5-flash-lite`) — review read-only del `git diff` velocissima ed economica.
 
 ### C. DeepSeek & Qwen (Roo Code / Cline)
 Nel tuo progetto:
@@ -348,7 +353,7 @@ LINT=
 
 ## Risparmio token
 - Hook `SessionStart` inietta `templates/terse-rules.md` (~350 token): niente preamboli/riepiloghi, commenti solo sul *perché*, letture mirate, log troncati.
-- Implementer (`opus`), verifier/reviewer/auditor (`sonnet`) girano come subagenti: il contesto principale tiene solo i risultati (3 righe per issue, una tabella per audit).
+- Implementer (`opus` su Claude / `pro` **Gemini 4 Argon** su Antigravity), verifier/auditor (`sonnet` su Claude / `flash` **Gemini 3.8 Flash** su Antigravity) e reviewer (`sonnet` su Claude / `flash_lite` **Gemini 3.8 Flash Low** su Antigravity) girano come subagenti: il contesto principale tiene solo i risultati (3 righe per issue, una tabella per audit).
 - Script bash deterministici per detect/gate/prova test/tempi test/scanner/segreti: zero token LLM.
 
 Nota onesta (dai benchmark di claude-token-efficient e caveman): le regole di stile tagliano l'**output**, non input né ragionamento. Il guadagno reale viene soprattutto da subagenti + log troncati.
