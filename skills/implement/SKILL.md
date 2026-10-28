@@ -9,10 +9,10 @@ Issue: #$ARGUMENTS
 Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 ## 0. Preflight
-- Dynamic Model Routing:
-  - If `flagship=deepseek|claude|gemini` is in args, run `python $S/model-resolver.py --flagship <val> --save`.
-  - If not specified and `.ba/models.json` does not exist: ask user ("Quale modello vuoi usare come Flagship? 1: DeepSeek, 2: Claude, 3: Gemini") and run `python $S/model-resolver.py --flagship <scelta> --save`.
-  - The resolver sets writer to Flagship, and verifier asymmetrically to a different family (cross-model verification).
+- Dynamic Model Routing (zero-friction, non-blocking):
+  - If `flagship=deepseek|claude|gemini` in args, run `python $S/model-resolver.py --flagship <val> --save`.
+  - Otherwise, auto-detects transparently from `.ba/models.json`, available API keys in `.env`, or current platform default. Same seamless flow as before (no prompt interruption).
+  - Writer runs on Flagship; Verifier runs asymmetrically on a separate family.
 - `gh issue view $ARGUMENTS --json title,body,state,labels`. Closed → stop. Label `needs-human` → stop: "richiede un'azione manuale" + its checklist.
 - `KIND` = `Kind:` line of the body (missing → `feature`).
 - Deps (from body or `.ba/plan.json`) must be merged/closed; else stop and name them.
