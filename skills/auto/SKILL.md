@@ -2,15 +2,16 @@
 name: auto
 description: Fully autonomous run - implements ALL open ba issues (or a spec) end to end without asking anything. Writer agent codes, separate checker agents verify. Stops only when every issue is done or blocked.
 disable-model-invocation: true
-argument-hint: "[docs/specs/x.md] [merge] [max=N] [par=N] [no-worktree]"
+argument-hint: "[docs/specs/x.md] [merge] [max=N] [par=N] [no-worktree] [flagship=deepseek|claude|gemini]"
 disallowed-tools: AskUserQuestion
-allowed-tools: Read Write Edit Grep Glob Agent Skill Bash(gh *) Bash(git *) Bash(bash *) Bash(jq *)
+allowed-tools: Read Write Edit Grep Glob Agent Skill Bash(gh *) Bash(git *) Bash(bash *) Bash(jq *) Bash(python *)
 ---
 
 Args: $ARGUMENTS
 Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 # Autonomous mode — hard rules
+- Dynamic Model Routing: resolve at start (`python $S/model-resolver.py [--flagship <val>] --save`). If `flagship=...` is in Args, pass it; else auto-detect from available API keys. Writer routes to Flagship; Verifier routes asymmetrically to a different family.
 - Add `.ba/auto.lock`, `.ba/auto.count`, `.ba/auto.waiting`, `.ba/logs/`, `.ba/cache/` and `.ba/security/` to `.gitignore` if missing.
 - The branch must contain ONLY this issue's changes: files already modified before the run (the user's own work in progress) are never committed — list them in the report instead.
 - NEVER ask the user anything. NEVER end your turn until the final report. Ambiguity → choose the option most consistent with the spec + existing code, log it under `Decisions` in `.ba/auto.md`, continue.

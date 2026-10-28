@@ -1,14 +1,18 @@
 ---
 name: implement
 description: Use only when the user or /ba:ship asks to implement a specific GitHub issue number. Implements ONE issue end to end - branch, real proof (red->green test, or no-regression proof for refactor/perf/test-split, or scanner proof for dependency/secret fixes), build, review, commit "closes #n", PR. Retries with written failure reasons.
-argument-hint: <issue-number>
-allowed-tools: Read Grep Glob Edit Write Agent Bash(gh *) Bash(git *) Bash(bash *)
+argument-hint: <issue-number> [flagship=deepseek|claude|gemini]
+allowed-tools: Read Grep Glob Edit Write Agent Bash(gh *) Bash(git *) Bash(bash *) Bash(python *)
 ---
 
 Issue: #$ARGUMENTS
 Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 ## 0. Preflight
+- Dynamic Model Routing:
+  - If `flagship=deepseek|claude|gemini` is in args, run `python $S/model-resolver.py --flagship <val> --save`.
+  - If not specified and `.ba/models.json` does not exist: ask user ("Quale modello vuoi usare come Flagship? 1: DeepSeek, 2: Claude, 3: Gemini") and run `python $S/model-resolver.py --flagship <scelta> --save`.
+  - The resolver sets writer to Flagship, and verifier asymmetrically to a different family (cross-model verification).
 - `gh issue view $ARGUMENTS --json title,body,state,labels`. Closed → stop. Label `needs-human` → stop: "richiede un'azione manuale" + its checklist.
 - `KIND` = `Kind:` line of the body (missing → `feature`).
 - Deps (from body or `.ba/plan.json`) must be merged/closed; else stop and name them.

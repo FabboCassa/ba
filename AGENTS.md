@@ -50,11 +50,25 @@ All AI agents can execute these bash scripts deterministically:
 | `sec-scan.sh` | Scans secrets (git tree + history), vulnerable code, and deps | `bash scripts/sec-scan.sh secrets` / `code` / `deps` |
 | `secret-guard.sh` | Prevents accidental commits or publishes containing secret keys | `bash scripts/secret-guard.sh` |
 | `test-times.sh` | Analyzes test suite runtimes, bottlenecks, with timeout killing | `bash scripts/test-times.sh --slow 60 --timeout 600` |
+| `model-resolver.py` | Dynamic multi-model discovery and cross-family tier resolver | `python scripts/model-resolver.py [--flagship ds\|claude\|gemini]` |
+| `deepseek-bridge.py`| Lightweight native bridge for DeepSeek API discovery & chat | `python scripts/deepseek-bridge.py best-model` |
 
 ---
 
 ## 4. Multi-AI Support Matrix
 - **Gemini / Google Antigravity**: Read `AGENTS.md` and `GEMINI.md`. Use Antigravity skills or run scripts via terminal tool.
-- **DeepSeek & Qwen**: Supported natively in Roo Code / Cline using `.clinerules` and `.roomodes`.
+- **DeepSeek & Qwen**: Supported natively in Roo Code / Cline using `.clinerules` and `.roomodes`, and via `scripts/deepseek-bridge.py` across all terminal orchestrators.
 - **OpenAI / Cursor / Windsurf**: Adheres to `.cursorrules`, `.cursor/rules/*.mdc`, `.windsurfrules`.
 - **Claude Code**: Uses `.claude-plugin/` and `skills/*/SKILL.md`.
+
+---
+
+## 5. Dynamic Model Routing & Cross-Family Asymmetric Verification
+To prevent correlated hallucinations and blind spots, BetterAI enforces asymmetric model verification:
+1. **Flagship Choice**: User selects or specifies the flagship family (`deepseek`, `claude`, `gemini`), or is prompted at skill launch.
+2. **Dynamic Discovery**: Resolves the highest version available via live API discovery (e.g. DeepSeek v4 > v3 > reasoner).
+3. **Asymmetric Rule**:
+   - Flagship **DeepSeek** (Writer) -> Verifier routes to **Claude Sonnet** or **Gemini Flash**.
+   - Flagship **Claude** (Writer) -> Verifier routes to **DeepSeek** or **Gemini Flash**.
+   - Flagship **Gemini** (Writer) -> Verifier routes to **DeepSeek** or **Claude Sonnet**.
+4. **Resolution Cache**: Persisted in `.ba/models.json` via `ba models --save`.

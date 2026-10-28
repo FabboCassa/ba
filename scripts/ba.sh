@@ -24,6 +24,8 @@ Deterministic Verification Commands:
   secret-guard [options]                   Secret leak prevention check or hook installer
   test-times [options]                     Analyze test durations and bottleneck tests
                                            Options: [--run] [--slow <sec>] [--timeout <sec>] [--tier fast|full] [--dir <dir>]
+  models [options]                         Dynamic multi-model discovery and tier resolution
+                                           Options: [--flagship deepseek|claude|gemini] [--save] [--json]
 
 Multi-AI Setup & Adapters:
   init <platform>                          Initialize adapter for target AI platform:
@@ -68,6 +70,9 @@ case "$cmd" in
     ;;
   test-times)
     bash "$SCRIPT_DIR/test-times.sh" "$@"
+    ;;
+  models)
+    python3 "$SCRIPT_DIR/model-resolver.py" "$@" 2>/dev/null || python "$SCRIPT_DIR/model-resolver.py" "$@"
     ;;
   version|--version|-v)
     echo "ba v$VERSION"

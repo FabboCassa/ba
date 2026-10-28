@@ -1,5 +1,4 @@
-.ba/logs/
-.ba/cache/
-.ba/security/
+.ba/
 __pycache__/
 *.pyc
+.env

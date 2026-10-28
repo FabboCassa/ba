@@ -97,6 +97,30 @@ TOOLS = [
                 "timeout": {"type": "number", "description": "Timeout in seconds for test execution (default: 600)"}
             }
         }
+    },
+    {
+        "name": "ba_models",
+        "description": "Resolve or inspect dynamic multi-model role matrix (Flagship, Verifier, Reviewer).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "flagship": {"type": "string", "enum": ["deepseek", "claude", "gemini"], "description": "Flagship family to command writer/architect"},
+                "save": {"type": "boolean", "description": "Save resolved matrix to .ba/models.json"}
+            }
+        }
+    },
+    {
+        "name": "ba_llm_query",
+        "description": "Query DeepSeek API directly for code generation, reasoning, or review.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "Prompt content to send"},
+                "system": {"type": "string", "description": "Optional system instruction"},
+                "model": {"type": "string", "description": "Model ID (e.g. deepseek-reasoner or deepseek-chat). Defaults to best detected."}
+            },
+            "required": ["prompt"]
+        }
     }
 ]
 
@@ -195,6 +219,26 @@ def handle_call_tool(tool_name, arguments):
             args.extend(["--timeout", str(arguments["timeout"])])
         rc, out = run_bash_script("test-times.sh", args, cwd=cwd)
         return rc, out
+
+    elif tool_name == "ba_models":
+        resolver = str(SCRIPTS_DIR / "model-resolver.py")
+        cmd_args = [sys.executable, resolver, "--json"]
+        if arguments.get("flagship"):
+            cmd_args.extend(["--flagship", arguments["flagship"]])
+        if arguments.get("save"):
+            cmd_args.append("--save")
+        proc = subprocess.run(cmd_args, cwd=cwd, capture_output=True, text=True)
+        return proc.returncode, proc.stdout.strip() if proc.returncode == 0 else proc.stderr.strip()
+
+    elif tool_name == "ba_llm_query":
+        bridge = str(SCRIPTS_DIR / "deepseek-bridge.py")
+        cmd_args = [sys.executable, bridge, "chat", "--prompt", arguments.get("prompt", "")]
+        if arguments.get("system"):
+            cmd_args.extend(["--system", arguments["system"]])
+        if arguments.get("model"):
+            cmd_args.extend(["--model", arguments["model"]])
+        proc = subprocess.run(cmd_args, cwd=cwd, capture_output=True, text=True)
+        return proc.returncode, proc.stdout.strip() if proc.returncode == 0 else proc.stderr.strip()
 
     else:
         return 1, f"Unknown tool: {tool_name}"
