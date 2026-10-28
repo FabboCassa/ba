@@ -13,7 +13,7 @@ from pathlib import Path
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "ba-mcp"
-SERVER_VERSION = "0.11.0"
+SERVER_VERSION = "0.12.0"
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT_DIR / "scripts"

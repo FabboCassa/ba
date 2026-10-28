@@ -85,12 +85,22 @@ HOOK
     echo "$out" >&2; echo "$BLOCK_MSG" >&2; exit 1 ;;
 esac
 
-# PreToolUse hook mode
+# PreToolUse hook mode (Claude Code: .tool_input.command; Antigravity/agy: .toolCall.args.CommandLine)
 INPUT=$(cat)
-if command -v jq >/dev/null 2>&1; then CMD=$(jq -r '.tool_input.command // empty' <<<"$INPUT")
-else CMD=$(python3 -c 'import sys,json;print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' <<<"$INPUT" 2>/dev/null || true); fi
-[[ -z $CMD ]] && exit 0
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+IS_AGY=0
+grep -q '"toolCall"' <<<"$INPUT" && IS_AGY=1
+agy_allow() { [[ $IS_AGY -eq 1 ]] && echo '{"decision":"allow"}'; exit 0; }
+
+if command -v jq >/dev/null 2>&1; then
+  CMD=$(jq -r '.tool_input.command // .toolCall.args.CommandLine // empty' <<<"$INPUT")
+  WS=$(jq -r '.workspacePaths[0] // empty' <<<"$INPUT")
+else
+  CMD=$(python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("tool_input",{}).get("command") or d.get("toolCall",{}).get("args",{}).get("CommandLine") or "")' <<<"$INPUT" 2>/dev/null || true)
+  WS=""
+fi
+[[ -z $CMD ]] && agy_allow
+[[ -n "${WS:-}" && -d "$WS" ]] && cd "$WS" 2>/dev/null || true
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || agy_allow
 
 MODES=()
 if grep -Eq '(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+commit' <<<"$CMD"; then
@@ -98,12 +108,20 @@ if grep -Eq '(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:s
 fi
 grep -Eq '(^|[;&|[:space:]])git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push' <<<"$CMD" && MODES+=(push)
 grep -Eq '(npm|pnpm|yarn)[[:space:]]+publish|dotnet[[:space:]]+nuget[[:space:]]+push|twine[[:space:]]+upload|cargo[[:space:]]+publish|docker[[:space:]]+push|gh[[:space:]]+(release[[:space:]]+(create|upload)|gist[[:space:]]+create)|fastlane|gradlew?[^;&|]*publish' <<<"$CMD" && MODES+=(publish)
-[[ ${#MODES[@]} -eq 0 ]] && exit 0
+[[ ${#MODES[@]} -eq 0 ]] && agy_allow
 
 for m in "${MODES[@]}"; do
   if ! out=$(run_check "$m"); then
+    if [[ $IS_AGY -eq 1 ]]; then
+      if command -v jq >/dev/null 2>&1; then
+        jq -nc --arg r "$out - $BLOCK_MSG" '{decision:"deny",reason:$r}'
+      else
+        printf '{"decision":"deny","reason":"%s"}\n' "$BLOCK_MSG"
+      fi
+      exit 0
+    fi
     { echo "$out"; echo "$BLOCK_MSG"; } >&2
     exit 2
   fi
 done
-exit 0
+agy_allow
