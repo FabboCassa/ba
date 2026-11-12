@@ -50,6 +50,7 @@ All AI agents can execute these bash scripts deterministically:
 | `sec-scan.sh` | Scans secrets (git tree + history), vulnerable code, and deps | `bash scripts/sec-scan.sh secrets` / `code` / `deps` |
 | `secret-guard.sh` | Prevents accidental commits or publishes containing secret keys | `bash scripts/secret-guard.sh` |
 | `test-times.sh` | Analyzes test suite runtimes, bottlenecks, with timeout killing | `bash scripts/test-times.sh --slow 60 --timeout 600` |
+| `delegate-coder.sh` | Detects external coders; delegates code writing + proof with zero-PM retries | `bash scripts/delegate-coder.sh --detect` / `ba delegate-code ...` |
 | `model-resolver.py` | Dynamic multi-model discovery and cross-family tier resolver | `python scripts/model-resolver.py [--flagship ds\|claude\|gemini]` |
 | `deepseek-bridge.py`| Lightweight native bridge for DeepSeek API discovery & chat | `python scripts/deepseek-bridge.py best-model` |
 
@@ -72,3 +73,14 @@ To prevent correlated hallucinations and blind spots, BetterAI enforces asymmetr
    - Flagship **Claude** (Writer) -> Verifier routes to **DeepSeek** or **Gemini Flash**.
    - Flagship **Gemini** (Writer) -> Verifier routes to **DeepSeek** or **Claude Sonnet**.
 4. **Resolution Cache**: Persisted in `.ba/models.json` via `ba models --save`.
+
+---
+
+## 6. Optional External Pure Coder (Colibri / DeepSeek)
+The main AI stays PM (spec, issues, brief) and final checker. Code writing may be delegated:
+1. **Detect, never assume**: `bash scripts/delegate-coder.sh --detect` → `colibri=UP|DOWN` (local OpenAI-compatible endpoint, `COLIBRI_API_BASE`), `deepseek=READY|MISSING_KEY` (`DEEPSEEK_API_KEY` from env, `~/.ba/credentials.env` or repo `.env`; never `.ba/`), `native=READY`, plus `pref`, `recommend`, `chain`.
+2. **Choose**: `coder=` arg > saved `.ba/config.json` pref (if available) > ask ONE question listing only available options (recommended first). Autonomous runs never ask: they use `chain`.
+3. **Delegate**: PM writes `.ba/runs/<n>-brief.md` (≤40 lines) → `bash scripts/delegate-coder.sh --issue <n> --coder <c> --brief ... --files ... --tests ... --test-cmd ...` → coder writes, script runs `prove-test.sh` + `gate.sh --tier fast`, retries ≤2 with the error tail. Last line: `RESULT: PASS | FAIL | CODER_UNAVAILABLE`.
+4. **Escalate**: `FAIL` → next attempt with the next coder (`colibri → deepseek → native`); `CODER_UNAVAILABLE` → next coder, same attempt. `PASS` → `verifier` + `reviewer` still decide.
+5. Nothing active → `native` (the `implementer` agent), identical to the pre-delegation flow.
+Rules: `skills/implement/references/coder-routing.md`.

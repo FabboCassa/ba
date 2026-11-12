@@ -39,11 +39,14 @@ To maximize code quality while minimizing token consumption and cost, always rou
    - Security Audit: `bash $S/sec-scan.sh secrets` / `code` / `deps`
    - Secret Guard: `bash $S/secret-guard.sh`
    - Test Times & Bottlenecks: `bash $S/test-times.sh --slow 60 --timeout 600`
+   - External Coders: `bash $S/delegate-coder.sh --detect` / `bash $S/delegate-coder.sh --issue <n> --coder colibri|deepseek --brief .ba/runs/<n>-brief.md --files "a,b" --tests "t" --test-cmd "<cmd>"`
 
-4. **Resuming Interrupted Runs (`.ba/auto.json`)**:
+4. **Optional External Pure Coder (Colibri / DeepSeek)**: Gemini stays PM + final checker. Detect first (never assume Colibri is running or a DeepSeek key exists), ask once with only the available options (autonomous runs: no question, use `chain=`), write a ≤40-line brief, run `delegate-coder.sh`. `FAIL` → next coder (`colibri → deepseek → native`); `CODER_UNAVAILABLE` → switch coder without blocking. Nothing active → `implementer` (`pro`) exactly as before. Rules: `skills/implement/references/coder-routing.md`.
+
+5. **Resuming Interrupted Runs (`.ba/auto.json`)**:
    - State is persisted on disk in `.ba/auto.json`, `.ba/auto.md`, `.ba/plan.json`, and `.ba/runs/<n>.md`, with isolated checkouts in `../<repo>-ba/<n>` git worktrees.
    - Any session (whether started in Claude Code, `agy`, or `gemini`) resumes directly from `.ba/auto.json`: skip `done`/`blocked`/`skipped` issues, and for `in_progress` issues run `verifier` (`flash`) + `reviewer` (`flash_lite`) on the existing worktree first.
 
-5. **Safety & Zero Leaks**:
+6. **Safety & Zero Leaks**:
    - Never commit `.env`, keys, credentials, or secrets.
    - Never rewrite git history or force-push without explicit user request.

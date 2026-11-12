@@ -1,7 +1,7 @@
 ---
 name: implement
 description: Use only when the user or /ba:ship asks to implement a specific GitHub issue number. Implements ONE issue end to end - branch, real proof (red->green test, or no-regression proof for refactor/perf/test-split, or scanner proof for dependency/secret fixes), build, review, commit "closes #n", PR. Retries with written failure reasons.
-argument-hint: <issue-number> [flagship=deepseek|claude|gemini]
+argument-hint: <issue-number> [coder=auto|colibri|deepseek|native] [flagship=deepseek|claude|gemini]
 allowed-tools: Read Grep Glob Edit Write Agent Bash(gh *) Bash(git *) Bash(bash *) Bash(python *)
 ---
 
@@ -13,6 +13,7 @@ Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
   - If `flagship=deepseek|claude|gemini` in args, run `python $S/model-resolver.py --flagship <val> --save`.
   - Otherwise, auto-detects transparently from `.ba/models.json`, available API keys in `.env`, or current platform default. Same seamless flow as before (no prompt interruption).
   - Writer runs on Flagship; Verifier runs asymmetrically on a separate family.
+- Coder: follow `${CLAUDE_SKILL_DIR}/references/coder-routing.md` §1 (skip the question if `coder=` is in args, e.g. from /ba:ship or /ba:auto). Result: `CHAIN` (e.g. `colibri,deepseek,native`; just `native` = today's flow).
 - `gh issue view $ARGUMENTS --json title,body,state,labels`. Closed → stop. Label `needs-human` → stop: "richiede un'azione manuale" + its checklist.
 - `KIND` = `Kind:` line of the body (missing → `feature`).
 - Deps (from body or `.ba/plan.json`) must be merged/closed; else stop and name them.
@@ -21,7 +22,7 @@ Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 ## 1. Loop (max 3 attempts)
 For attempt k:
-a. Delegate to agent **ba:implementer** with: issue title/body, `KIND`, acceptance list, branch, `$S` path, `docs/architecture.md` if present, and (k>1) the full failure notes from `.ba/runs/$ARGUMENTS.md`.
+a. Writer = coder at position k of `CHAIN` (last entry repeats). Not `native` → delegated attempt per `references/coder-routing.md` §2 (brief + `delegate-coder.sh`; `CODER_UNAVAILABLE` → next coder, same k). `native` → delegate to agent **ba:implementer** with: issue title/body, `KIND`, acceptance list, branch, `$S` path, `docs/architecture.md` if present, and (k>1) the full failure notes from `.ba/runs/$ARGUMENTS.md`.
    It must return: `TESTS: <files>`, `IMPL: <files>`, one-line summary.
 b. Delegate to agent **ba:verifier** with the same issue, `KIND`, base ref and returned file lists. Proof by `KIND`:
    - `feature`, `security`: `bash $S/prove-test.sh "<TEST cmd>" <test files>` → RED ok + GREEN ok;
@@ -35,7 +36,7 @@ b. Delegate to agent **ba:verifier** with the same issue, `KIND`, base ref and r
 c. PASS → go to 2.
    FAIL → append to `.ba/runs/$ARGUMENTS.md`:
    `## Attempt k - FAIL` / `Why:` root cause in 1-3 lines (not the symptom) / `Evidence:` trimmed log / `Next:` what to change.
-   Also `gh issue comment $ARGUMENTS` with the same block (label `security` on a public repo: comment only `Attempt k failed, details in .ba/runs/`). Then next attempt.
+   Also `gh issue comment $ARGUMENTS` with the same block (label `security` on a public repo: comment only `Attempt k failed, details in .ba/runs/`). Then next attempt (next coder in `CHAIN`).
 After 3 FAILs: `gh issue edit $ARGUMENTS --add-label blocked`, keep branch, report the 3 reasons, stop.
 
 ## 2. Review
@@ -45,6 +46,6 @@ Agent **ba:reviewer** on `git diff origin/<base>`. Blocking findings → treat a
 - `git add -A -- . ':!.ba/logs' ':!.ba/cache' ':!.ba/security'` ; commit: `<type>(<scope>): <title>` + blank line + `Closes #$ARGUMENTS` (Conventional Commits, ≤72 char subject, body only if non-obvious; type from KIND: feat / fix / refactor / perf / test / chore(deps) / build). The secret-guard hook scans it.
 - `git push -u origin HEAD`
 - `gh pr create --base <base> --title "<same subject>" --body "Closes #$ARGUMENTS\n\nVerified: <build cmd> ✓ <test cmd> ✓ <proof line by KIND> ✓"`
-- Output 3 lines: PR url, tests added (or proof used), attempts used.
+- Output 3 lines: PR url, tests added (or proof used), attempts used + coders (e.g. `2 att: colibri✗ deepseek✓`).
 
 Never: skip/disable/weaken tests, mock the unit under test, `--no-verify`, force-push to base, commit secrets.

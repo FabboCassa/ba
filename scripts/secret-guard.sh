@@ -37,7 +37,7 @@ check_files() {  # file list on stdin
   return 0
 }
 
-as_diff() { while IFS= read -r -d '' f; do git diff --no-index --no-color /dev/null "$f" 2>/dev/null; done; }  # NUL-separated paths on stdin
+as_diff() { while IFS= read -r -d '' f; do git diff --no-index --no-color /dev/null "$f" 2>/dev/null; done; true; }  # NUL paths on stdin. `true`: --no-index exits 1 per file, pipefail would turn it into a false BLOCK
 untracked_as_diff() { git ls-files -o --exclude-standard -z | as_diff; }
 
 push_range() {

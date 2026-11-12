@@ -13,7 +13,7 @@ from pathlib import Path
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "ba-mcp"
-SERVER_VERSION = "0.13.0"
+SERVER_VERSION = "0.14.0"
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = ROOT_DIR / "scripts"
@@ -107,6 +107,35 @@ TOOLS = [
                 "flagship": {"type": "string", "enum": ["deepseek", "claude", "gemini"], "description": "Flagship family to command writer/architect"},
                 "save": {"type": "boolean", "description": "Save resolved matrix to .ba/models.json"}
             }
+        }
+    },
+    {
+        "name": "ba_detect_coders",
+        "description": "Detect external Pure Coders: colibri=UP|DOWN (local OpenAI-compatible endpoint), deepseek=READY|MISSING_KEY, native=READY. Also returns saved pref, recommendation and fallback chain.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dir": {"type": "string", "description": "Target repository directory (default: current directory)"},
+                "coder": {"type": "string", "enum": ["auto", "colibri", "deepseek", "native"], "description": "Compute the fallback chain for this choice"}
+            }
+        }
+    },
+    {
+        "name": "ba_delegate_code",
+        "description": "Delegate pure code writing to colibri or deepseek from a brief, then run prove-test + gate fast with up to 2 internal error-feedback retries. Last line: RESULT: PASS | FAIL | CODER_UNAVAILABLE.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dir": {"type": "string", "description": "Target repository directory (default: current directory)"},
+                "issue": {"type": "string", "description": "Issue number"},
+                "coder": {"type": "string", "enum": ["colibri", "deepseek"]},
+                "brief": {"type": "string", "description": "Brief path, e.g. .ba/runs/12-brief.md"},
+                "files": {"type": "array", "items": {"type": "string"}, "description": "Implementation files the coder may write"},
+                "tests": {"type": "array", "items": {"type": "string"}, "description": "Test files the coder may write (proved RED->GREEN)"},
+                "test_cmd": {"type": "string", "description": "Filtered command running only those tests"},
+                "retries": {"type": "number", "description": "Internal retries (default 2)"}
+            },
+            "required": ["issue", "coder", "brief", "files"]
         }
     },
     {
@@ -229,6 +258,21 @@ def handle_call_tool(tool_name, arguments):
             cmd_args.append("--save")
         proc = subprocess.run(cmd_args, cwd=cwd, capture_output=True, text=True)
         return proc.returncode, proc.stdout.strip() if proc.returncode == 0 else proc.stderr.strip()
+
+    elif tool_name == "ba_detect_coders":
+        args = ["--detect"]
+        if arguments.get("coder"):
+            args.extend(["--coder", arguments["coder"]])
+        return run_bash_script("delegate-coder.sh", args, cwd=cwd)
+
+    elif tool_name == "ba_delegate_code":
+        args = ["--issue", arguments.get("issue", ""), "--coder", arguments.get("coder", ""),
+                "--brief", arguments.get("brief", ""), "--files", ",".join(arguments.get("files", []))]
+        if arguments.get("tests"):
+            args.extend(["--tests", ",".join(arguments["tests"]), "--test-cmd", arguments.get("test_cmd", "")])
+        if "retries" in arguments:
+            args.extend(["--retries", str(int(arguments["retries"]))])
+        return run_bash_script("delegate-coder.sh", args, cwd=cwd)
 
     elif tool_name == "ba_llm_query":
         bridge = str(SCRIPTS_DIR / "deepseek-bridge.py")

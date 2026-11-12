@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="0.13.0"
+VERSION="0.14.0"
 
 show_help() {
   cat <<EOF
@@ -27,6 +27,13 @@ Deterministic Verification Commands:
   models [options]                         Dynamic multi-model discovery and tier resolution
                                            Options: [--flagship deepseek|claude|gemini] [--save] [--json]
 
+External Pure Coder (optional, PM = your main AI):
+  detect-coders [--coder X] [--json] [--warm]  colibri/deepseek/native status, chain (--warm preloads colibri)
+  coder-save auto|colibri|deepseek|native  Save coder preference in .ba/config.json
+  delegate-code --issue <n> --coder colibri|deepseek --brief <f> --files "a,b" [--tests "t" --test-cmd "<cmd>"]
+                                           Coder writes, prove-test + gate fast, ≤2 zero-PM retries
+                                           RESULT: PASS (0) | FAIL (3) | CODER_UNAVAILABLE (4)
+
 Multi-AI Setup & Adapters:
   init <platform>                          Initialize adapter for target AI platform:
                                            (gemini, cursor, windsurf, copilot, roo, cline, mcp, all)
@@ -35,8 +42,8 @@ AI Workflow Skills:
   /ba:architect <idea>                     Full system architecture, C4 diagrams, ERD, hosting & cloud topology
   /ba:spec <idea>                          Interview user until feature is fully specified -> docs/specs/<slug>.md
   /ba:issues <spec|audit>                  Break spec/audit into small GitHub issues with proof kind
-  /ba:implement <n>                        Implement one issue test-first with real proof
-  /ba:auto [spec] [merge]                  Fully autonomous execution of all issues
+  /ba:implement <n> [coder=X]              Implement one issue test-first with real proof
+  /ba:auto [spec] [merge] [coder=X]        Fully autonomous execution of all issues
   /ba:optimize [tests|arch|code|perf]      Audit for slow tests (tiering), arch drift, dead code, perf
   /ba:secure [secrets|code|deps|platform]  Security audit across code, dependencies, and cloud platforms
 
@@ -74,6 +81,16 @@ case "$cmd" in
   models)
     python3 "$SCRIPT_DIR/model-resolver.py" "$@" 2>/dev/null || python "$SCRIPT_DIR/model-resolver.py" "$@"
     ;;
+  detect-coders)
+    bash "$SCRIPT_DIR/delegate-coder.sh" --detect "$@"
+    ;;
+  coder-save)
+    PY=python; command -v python >/dev/null 2>&1 || PY=python3
+    "$PY" "$SCRIPT_DIR/coder.py" save "$@"
+    ;;
+  delegate-code)
+    bash "$SCRIPT_DIR/delegate-coder.sh" "$@"
+    ;;
   version|--version|-v)
     echo "ba v$VERSION"
     ;;
@@ -93,7 +110,7 @@ case "$cmd" in
           cp -f "$ROOT_DIR/templates/adapters/gemini/agents/"*.md "$HOME/.gemini/config/plugins/ba/agents/" 2>/dev/null || true
           cp -f "$ROOT_DIR/templates/adapters/gemini/hooks.json" "$HOME/.gemini/config/plugins/ba/hooks.json" 2>/dev/null || true
           cp -f "$ROOT_DIR/templates/adapters/gemini/plugin.json" "$HOME/.gemini/config/plugins/ba/plugin.json" 2>/dev/null || true
-          cp -f "$ROOT_DIR/scripts/"*.sh "$HOME/.gemini/config/plugins/ba/scripts/" 2>/dev/null || true
+          cp -f "$ROOT_DIR/scripts/"*.sh "$ROOT_DIR/scripts/"*.py "$HOME/.gemini/config/plugins/ba/scripts/" 2>/dev/null || true
           cp -rf "$ROOT_DIR/skills/"* "$HOME/.gemini/config/plugins/ba/skills/" 2>/dev/null || true
         fi
         echo "Initialized Gemini / Google Antigravity config (pro=Gemini 4 Argon for implementer, flash=Gemini 3.8 Flash for verifier/auditor, flash_lite=Gemini 3.8 Flash Low for reviewer)."

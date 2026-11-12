@@ -68,7 +68,7 @@ Per qualsiasi client con supporto MCP (Cursor, Windsurf, Claude Desktop, Antigra
   }
 }
 ```
-Fornisce direttamente all'AI i tool: `ba_gate`, `ba_detect`, `ba_prove_test`, `ba_prove_refactor`, `ba_sec_scan`, `ba_test_times`.
+Fornisce direttamente all'AI i tool: `ba_gate`, `ba_detect`, `ba_prove_test`, `ba_prove_refactor`, `ba_sec_scan`, `ba_test_times`, `ba_models`, `ba_detect_coders`, `ba_delegate_code`, `ba_llm_query`.
 
 ### F. CLI Indipendente (`ba`)
 Aggiungi `ba/bin` al tuo `PATH` (o usa `./bin/ba` / `./bin/ba.ps1` su Windows):
@@ -77,6 +77,32 @@ ba gate                     # Build + lint + test compatto
 ba prove-test "<test-cmd>" <file...> # Verifica che il test sia reale (RED->GREEN)
 ba scan secrets             # Scansione segreti su file e storia git
 ba init all                 # Prepara il repository per tutte le AI
+ba detect-coders            # Colibri / DeepSeek attivi? (<1s)
+```
+
+### G. Pure Coder esterno opzionale (Colibri locale / DeepSeek API)
+L'AI principale (Claude, Gemini, OpenAI) resta **PM / Tech Lead** (spec, issue, brief) e **controllore finale** (`verifier` + `reviewer` su `git diff`). La scrittura pura del codice può andare a:
+- **Colibri**: server locale di modelli (`COLIBRI_API_BASE`, default `http://127.0.0.1:8000/v1`); va bene anche qualsiasi endpoint OpenAI-compatibile (Ollama `:11434/v1`, LM Studio `:1234/v1`). Modello `COLIBRI_MODEL` (default: il `*coder*` più grande esposto da `/models`, altrimenti il primo).
+- **DeepSeek**: `DEEPSEEK_API_KEY` (modello `DEEPSEEK_CODER_MODEL`, default `deepseek-chat`).
+
+Niente è dato per scontato: `ba detect-coders` controlla in <1s cosa è attivo:
+```
+colibri=UP base=http://127.0.0.1:8000/v1 model=qwen3.6-colibri
+deepseek=MISSING_KEY
+native=READY
+pref=none (none)
+recommend=colibri
+chain=colibri,native
+```
+All'avvio di `/ba:implement` e `/ba:ship` (senza `coder=` negli argomenti e senza preferenza salvata valida) ti fa **una sola domanda** con le sole opzioni reali: entrambi attivi → `Auto (Colibri → DeepSeek)` consigliato; uno solo → quello, `Nativo` o "attiva l'altro ora"; nessuno → `Nativo` consigliato, "avvio Colibri e riprova" o "configura DeepSeek". Poi chiede se salvare la scelta in `.ba/config.json` (`ba coder-save <x>`). `/ba:auto` non chiede mai: usa argomento > preferenza > raccomandazione e lo scrive in `.ba/auto.md`.
+
+Flusso delegato per issue: il PM scrive `.ba/runs/<n>-brief.md` (≤40 righe: file, firme, criteri, trappole) → `ba delegate-code` chiama il coder, applica i file, lancia `prove-test.sh` + `gate.sh --tier fast` e, se falliscono, rimanda le ultime 40 righe d'errore al coder (max 2 retry, zero token del PM). Esito: `PASS` → `verifier` + `reviewer` come sempre; `FAIL` → working tree ripristinato, tentativo successivo col coder superiore (`colibri → deepseek → native`); `CODER_UNAVAILABLE` (Colibri spento, HTTP/quota DeepSeek) → passa al prossimo coder senza bloccare. Se nessuno è attivo, tutto funziona come prima (`native`).
+
+**Cache**: il prompt al coder ha un prefisso stabile (istruzioni di sistema → brief → file com'erano prima del run); nei retry si aggiungono solo in coda l'output precedente e l'errore. Così la context cache automatica di DeepSeek (token in cache a circa 1/10 del prezzo) e la prefix-cache del server locale riusano tutto il resto. Ogni chiamata stampa `tokens in=… cached=… out=…`. `ba detect-coders --warm` carica il modello di Colibri e mette in cache il prompt di sistema in background mentre il PM scrive il brief (evita il primo avvio a freddo). Variabili: `BA_CODER_TIMEOUT` (default 600s), `BA_CODER_MAX_TOKENS` (default 8192).
+
+**Dove mettere la chiave DeepSeek** (mai in chat, mai in `.ba/`, che può finire nei commit o nei log): variabile d'ambiente, oppure `~/.ba/credentials.env` (vale per tutti i repo), oppure `.env` del repo (già in `.gitignore`):
+```
+DEEPSEEK_API_KEY=sk-...
 ```
 
 Requisiti: `git`, `gh` autenticato (`gh auth login`), `bash` (su Windows: Git Bash, incluso in Git for Windows), `python3` per MCP e `/ba:optimize`.
@@ -324,7 +350,8 @@ docs/audits/optimize-*.md     audit di ottimizzazione
 .ba/plan.json                 issue, dipendenze, kind
 .ba/runs/<n>.md               motivi dei tentativi falliti
 .ba/auto.json|auto.md         stato e decisioni di /ba:auto
-.ba/config.json               piattaforme e permesso ricerche online
+.ba/config.json               piattaforme, permesso ricerche online, coder preferito (mai chiavi)
+.ba/runs/<n>-brief.md         brief per il coder esterno
 .ba/security/                 report sicurezza, requisiti e fonti (in .gitignore, mai committato)
 .ba/logs/  .ba/cache/         log, report test, tempi della base (in .gitignore)
 ```
@@ -367,7 +394,9 @@ templates/adapters/{gemini,cursor,windsurf,copilot,cline-roo,mcp} # Template per
 .claude-plugin/{plugin,marketplace}.json             # Plugin nativo Claude Code
 skills/{architect,spec,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
 agents/{implementer,verifier,reviewer,auditor}.md
-scripts/{ba,detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard}.sh
+scripts/{ba,detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard,delegate-coder}.sh
+scripts/{coder,model-resolver,deepseek-bridge}.py    # client coder esterni, routing modelli
+tests/test_coder.py                                  # python -m unittest discover -s tests
 hooks/hooks.json   templates/{terse-rules,spec,architecture,system-architecture,settings.auto.json,security.yml}
 ```
 Hook da aggiungere in `hooks/hooks.json` (accanto a `SessionStart` e `Stop` già presenti):

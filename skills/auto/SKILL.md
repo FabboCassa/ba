@@ -2,7 +2,7 @@
 name: auto
 description: Fully autonomous run - implements ALL open ba issues (or a spec) end to end without asking anything. Writer agent codes, separate checker agents verify. Stops only when every issue is done or blocked.
 disable-model-invocation: true
-argument-hint: "[docs/specs/x.md] [merge] [max=N] [par=N] [no-worktree] [flagship=deepseek|claude|gemini]"
+argument-hint: "[docs/specs/x.md] [merge] [max=N] [par=N] [no-worktree] [coder=auto|colibri|deepseek|native] [flagship=deepseek|claude|gemini]"
 disallowed-tools: AskUserQuestion
 allowed-tools: Read Write Edit Grep Glob Agent Skill Bash(gh *) Bash(git *) Bash(bash *) Bash(jq *) Bash(python *)
 ---
@@ -12,6 +12,7 @@ Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 
 # Autonomous mode — hard rules
 - Dynamic Model Routing: resolve at start (`python $S/model-resolver.py [--flagship <val>] --save`). If `flagship=...` is in Args, pass it; else auto-detect from available API keys. Writer routes to Flagship; Verifier routes asymmetrically to a different family.
+- Coder routing: per `${CLAUDE_SKILL_DIR}/../implement/references/coder-routing.md` (auto rules: never ask). `CHAIN` = `chain=` of `bash $S/delegate-coder.sh --detect [--coder <arg>]`; log it as the first line of `.ba/auto.md`. Delegated coders are writers too: the checker rules below apply unchanged. A `CODER_UNAVAILABLE` mid-run drops that coder from `CHAIN` for the rest of the run (logged in `.ba/auto.md`), never blocks.
 - Add `.ba/auto.lock`, `.ba/auto.count`, `.ba/auto.waiting`, `.ba/logs/`, `.ba/cache/` and `.ba/security/` to `.gitignore` if missing.
 - The branch must contain ONLY this issue's changes: files already modified before the run (the user's own work in progress) are never committed — list them in the report instead.
 - NEVER ask the user anything. NEVER end your turn until the final report. Ambiguity → choose the option most consistent with the spec + existing code, log it under `Decisions` in `.ba/auto.md`, continue.
@@ -41,7 +42,7 @@ Scripts: `S=${CLAUDE_SKILL_DIR}/../../scripts`
 Repeat until the queue is empty:
 1. READY = queued issues whose deps are all `done` (or closed). Deps `blocked`/`skipped` → mark the issue `skipped: dep #d blocked`.
 2. Take the first `min(PAR, |READY|)` issues. With `PAR=1` or `no-worktree`, take exactly 1. Issues of Kind `perf` and `test-split` measure time: never run them in parallel with other issues (their wave has size 1).
-3. Create each issue's worktree, then dispatch ALL their writers **in one message, one Agent call each** (that is what makes them parallel). Never dispatch a writer for an issue whose worktree is missing.
+3. Create each issue's worktree, then dispatch ALL their writers **in one message, one Agent/Bash call each** (delegated coder: one `delegate-coder.sh` call per worktree) (that is what makes them parallel). Never dispatch a writer for an issue whose worktree is missing.
 4. When the writers return, dispatch the checkers the same way (one `ba:verifier` per issue in a single message, then `ba:reviewer`).
 5. Handle each issue's result (ship / retry / block) per the rules below. Retries of different issues in the same wave are dispatched together too.
 6. Merge (if `MERGE`) strictly one at a time, in queue order: `gh pr checks` → `gh pr merge --squash --delete-branch` → `git -C <main repo> switch <base> && git pull -q`. If a later PR in the wave no longer merges cleanly, rebase its worktree on the new base and re-run its checkers; still failing → that issue takes a FAIL attempt with reason `conflict after #<n>`.
@@ -69,8 +70,8 @@ and append one line to `.ba/auto.md`.
 # 2. Final report (only output of the whole run)
 ```
 ba:auto — <done>/<total> done, <blocked> blocked, <skipped> skipped (par=<PAR>)
-#14 | PR #21 | ✓ 1 att
-#15 | PR #22 | ✓ 3 att
+#14 | PR #21 | ✓ 1 att (colibri)
+#15 | PR #22 | ✓ 3 att (colibri✗ deepseek✗ native✓)
 #16 | -      | blocked: <1-line reason> (.ba/runs/16.md)
 Needs you: #17 rotate DB password, #18 Play Console data safety form
 Decisions: <n> logged in .ba/auto.md
