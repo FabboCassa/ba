@@ -30,13 +30,21 @@ Final chain = `bash $S/delegate-coder.sh --detect --warm --coder <choice>` → `
    few lines of existing interfaces it depends on), acceptance checks → each one a test assertion,
    test framework/style to copy, traps (edge cases, things not to touch), `Test cmd` (filtered).
    Attempt k>1: append the `Why/Next` of the previous failure.
-2. `bash $S/delegate-coder.sh --issue <n> --coder <head> --brief .ba/runs/<n>-brief.md --files "<impl,...>" --tests "<tests,...>" --test-cmd "<filtered cmd>"`
+2. DeepSeek tier (coder = `deepseek` only; your own estimate per issue, log it as `tier: <x> (<why>)` in `.ba/runs/<n>.md`):
+   - `flash` (cheap, no reasoning): ≤2 impl files, the change follows a pattern already in the repo
+     (CRUD, endpoint/DTO/mapping like an existing one, rename, config, `test-split`, `dep-upgrade`,
+     bugfix with a clear repro and known root cause).
+   - `pro` (reasons first, costs more): ≥3 impl files or cross-module, new algorithm/state/concurrency,
+     `security`, `perf`, a `refactor` with subtle behavior, unclear root cause, or a brief you can't make exact.
+   - Unsure → `pro`. Upgrade: a `flash` FAIL is retried as `pro` on the next attempt if ≥2 attempts remain,
+     else go to the next coder. A pinned model (`DEEPSEEK_CODER_MODEL` / `deepseek_model`) overrides the tier.
+   `bash $S/delegate-coder.sh --issue <n> --coder <head> [--tier flash|pro] --brief .ba/runs/<n>-brief.md --files "<impl,...>" --tests "<tests,...>" --test-cmd "<filtered cmd>"`
    (non-test kinds: omit `--tests/--test-cmd`; the verifier still runs the KIND proof). Run in the issue's worktree.
    The script retries ≤2 times internally with the error tail — no PM tokens spent.
-3. Result (last line):
+3. Result (last line); name DeepSeek attempts with their tier in reports, e.g. `deepseek:flash✗ deepseek:pro✓`:
    - `PASS` → verifier + reviewer as usual, given only issue text, KIND, file lists, branch. Writer claims ignored.
    - `FAIL` → tree rolled back; counts as attempt k: write `Why/Evidence/Next` to `.ba/runs/<n>.md`,
-     next attempt uses the next coder in chain (`colibri → deepseek → native`).
+     next attempt uses the next coder in chain (`colibri → deepseek → native`), or the same coder as `pro` per the upgrade rule above.
    - `CODER_UNAVAILABLE` → drop it from chain, log `coder switch: <from> → <to> (<reason>)` in
      `.ba/runs/<n>.md` (and `.ba/auto.md` in auto), retry the SAME attempt with the next coder. Never block on it.
 4. Verifier/reviewer FAIL after a delegated PASS → same as FAIL (escalate).

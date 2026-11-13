@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CODER = ROOT / "scripts" / "coder.py"
 DELEGATE = ROOT / "scripts" / "delegate-coder.sh"
+BRIDGE = ROOT / "scripts" / "deepseek-bridge.py"
 
 
 def find_bash() -> str:
@@ -42,9 +43,11 @@ TEST = block("test_calc.py", "import unittest\nfrom calc import add\n\n\nclass T
 class FakeCoder:
     """OpenAI-compatible stub: GET /v1/models, POST /v1/chat/completions from a reply queue."""
 
-    def __init__(self, replies=None, status=200):
+    def __init__(self, replies=None, status=200, models=("tiny-chat", "qwen-coder-7b"), finish="stop"):
         self.replies = list(replies or [])
         self.status = status
+        self.models = list(models)
+        self.finish = finish
         self.requests = []
         outer = self
 
@@ -61,7 +64,7 @@ class FakeCoder:
                 self.wfile.write(data)
 
             def do_GET(self):
-                self._send(200, {"data": [{"id": "tiny-chat"}, {"id": "qwen-coder-7b"}]})
+                self._send(200, {"data": [{"id": m} for m in outer.models]})
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -70,7 +73,8 @@ class FakeCoder:
                     return self._send(outer.status, {"error": "quota"})
                 content = outer.replies.pop(0) if outer.replies else ""
                 usage = {"prompt_tokens": 100, "completion_tokens": 20, "prompt_cache_hit_tokens": 64}
-                self._send(200, {"choices": [{"message": {"content": content}}], "usage": usage})
+                choice = {"message": {"content": content}, "finish_reason": outer.finish}
+                self._send(200, {"choices": [choice], "usage": usage, "model": body.get("model")})
 
         self.server = HTTPServer(("127.0.0.1", 0), H)
         self.base = f"http://127.0.0.1:{self.server.server_port}/v1"
@@ -174,11 +178,18 @@ class DelegateTests(Base):
         (self.repo / ".ba" / "commands.env").write_text("BUILD=true\nTEST=python -m unittest test_calc\n")
         (self.repo / ".ba" / "runs" / "1-brief.md").write_text("Add calc.add(a, b) returning the sum.\n")
 
-    def delegate(self, coder="colibri"):
+    def delegate(self, coder="colibri", *extra):
         return subprocess.run(
             [BASH, str(DELEGATE), "--issue", "1", "--coder", coder, "--brief", ".ba/runs/1-brief.md",
-             "--files", "calc.py", "--tests", "test_calc.py", "--test-cmd", "python -m unittest test_calc"],
+             "--files", "calc.py", "--tests", "test_calc.py", "--test-cmd", "python -m unittest test_calc", *extra],
             cwd=self.repo, env=self.env, capture_output=True, text=True)
+
+    def tier_model(self, tier, models):
+        srv = self.fake(replies=[IMPL_OK + TEST], models=models)
+        self.env.update(DEEPSEEK_API_BASE=srv.base, DEEPSEEK_API_KEY="sk-test")
+        r = self.delegate("deepseek", "--tier", tier)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        return srv.requests[0]["body"]["model"]
 
     def test_pass_first_try(self):
         self.env["COLIBRI_API_BASE"] = self.fake(replies=[IMPL_OK + TEST]).base
@@ -221,6 +232,53 @@ class DelegateTests(Base):
         r = self.delegate()
         self.assertEqual(r.returncode, 4, r.stdout)
 
+    def test_deepseek_uses_newest_model_and_large_output_cap(self):
+        srv = self.fake(replies=[IMPL_OK + TEST],
+                        models=["deepseek-chat", "deepseek-flash", "deepseek-v4-pro", "deepseek-v5-flash",
+                                "deepseek-v5-pro"])
+        self.env.update(DEEPSEEK_API_BASE=srv.base, DEEPSEEK_API_KEY="sk-test")
+        r = self.delegate("deepseek")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(srv.requests[0]["body"]["model"], "deepseek-v5-pro")
+        self.assertEqual(srv.requests[0]["body"]["max_tokens"], 65536)
+        self.assertIn("model=deepseek-v5-pro", r.stdout)
+
+    def test_pm_tier_picks_newest_model_of_that_class(self):
+        many = ["deepseek-chat", "deepseek-flash", "deepseek-v4-pro", "deepseek-v5-flash", "deepseek-v5-pro"]
+        self.assertEqual(self.tier_model("flash", many), "deepseek-v5-flash")
+        self.assertEqual(self.tier_model("pro", many), "deepseek-v5-pro")
+        self.assertEqual(self.tier_model("flash", ["deepseek-flash", "deepseek-v4-pro"]), "deepseek-flash")
+
+    def test_pro_tier_without_discovery_falls_back_to_a_pro_model(self):
+        self.assertEqual(self.tier_model("pro", []), "deepseek-v4-pro")
+
+    def test_unknown_tier_is_usage_error(self):
+        self.env.update(DEEPSEEK_API_KEY="sk-test", DEEPSEEK_API_BASE=closed_port_base())
+        self.assertEqual(self.delegate("deepseek", "--tier", "huge").returncode, 2)
+
+    def test_explicit_deepseek_model_and_token_cap_win(self):
+        srv = self.fake(replies=[IMPL_OK + TEST], models=["deepseek-v9-pro"])
+        self.env.update(DEEPSEEK_API_BASE=srv.base, DEEPSEEK_API_KEY="sk-test",
+                        DEEPSEEK_CODER_MODEL="deepseek-flash", BA_CODER_MAX_TOKENS="1000")
+        r = self.delegate("deepseek")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(srv.requests[0]["body"]["model"], "deepseek-flash")
+        self.assertEqual(srv.requests[0]["body"]["max_tokens"], 1000)
+
+    def test_colibri_keeps_small_output_cap(self):
+        srv = self.fake(replies=[IMPL_OK + TEST])
+        self.env["COLIBRI_API_BASE"] = srv.base
+        self.assertEqual(self.delegate().returncode, 0)
+        self.assertEqual(srv.requests[0]["body"]["max_tokens"], 8192)
+
+    def test_truncated_reply_is_rejected_not_applied(self):
+        srv = self.fake(replies=[IMPL_OK + TEST] * 3, finish="length")
+        self.env.update(DEEPSEEK_API_BASE=srv.base, DEEPSEEK_API_KEY="sk-test")
+        r = self.delegate("deepseek")
+        self.assertEqual(r.returncode, 3, r.stdout)
+        self.assertIn("TRUNCATED", r.stdout)
+        self.assertFalse((self.repo / "calc.py").exists())
+
     def test_paths_outside_targets_are_rejected(self):
         evil = block("../evil.py", "x = 1\n") + block("other.py", "x = 1\n")
         self.env["COLIBRI_API_BASE"] = self.fake(replies=[evil] * 3).base
@@ -228,6 +286,17 @@ class DelegateTests(Base):
         self.assertEqual(r.returncode, 3, r.stdout)
         self.assertFalse((self.repo / "other.py").exists())
         self.assertFalse((self.tmp / "evil.py").exists())
+
+
+class BridgeTests(Base):
+    def test_bridge_reads_key_from_ba_credentials(self):
+        (self.home / ".ba").mkdir()
+        (self.home / ".ba" / "credentials.env").write_text("DEEPSEEK_API_KEY=sk-home\n")
+        code = ("import importlib.util as u, sys; s = u.spec_from_file_location('b', sys.argv[1]); "
+                "m = u.module_from_spec(s); s.loader.exec_module(m); print(m.get_api_key())")
+        out = subprocess.run([sys.executable, "-c", code, str(BRIDGE)], cwd=self.repo, env=self.env,
+                             capture_output=True, text=True, check=True).stdout.strip()
+        self.assertEqual(out, "sk-home")
 
 
 if __name__ == "__main__":

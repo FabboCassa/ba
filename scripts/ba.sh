@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="0.14.0"
+VERSION="0.15.0"
 
 show_help() {
   cat <<EOF
@@ -30,7 +30,7 @@ Deterministic Verification Commands:
 External Pure Coder (optional, PM = your main AI):
   detect-coders [--coder X] [--json] [--warm]  colibri/deepseek/native status, chain (--warm preloads colibri)
   coder-save auto|colibri|deepseek|native  Save coder preference in .ba/config.json
-  delegate-code --issue <n> --coder colibri|deepseek --brief <f> --files "a,b" [--tests "t" --test-cmd "<cmd>"]
+  delegate-code --issue <n> --coder colibri|deepseek --brief <f> --files "a,b" [--tests "t" --test-cmd "<cmd>"] [--tier flash|pro]
                                            Coder writes, prove-test + gate fast, ≤2 zero-PM retries
                                            RESULT: PASS (0) | FAIL (3) | CODER_UNAVAILABLE (4)
 

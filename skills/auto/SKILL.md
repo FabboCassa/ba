@@ -71,7 +71,7 @@ and append one line to `.ba/auto.md`.
 ```
 ba:auto — <done>/<total> done, <blocked> blocked, <skipped> skipped (par=<PAR>)
 #14 | PR #21 | ✓ 1 att (colibri)
-#15 | PR #22 | ✓ 3 att (colibri✗ deepseek✗ native✓)
+#15 | PR #22 | ✓ 3 att (colibri✗ deepseek:flash✗ deepseek:pro✓)
 #16 | -      | blocked: <1-line reason> (.ba/runs/16.md)
 Needs you: #17 rotate DB password, #18 Play Console data safety form
 Decisions: <n> logged in .ba/auto.md

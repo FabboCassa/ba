@@ -4,7 +4,7 @@ scripts/coder.py — external "Pure Coder" client (Colibri local / DeepSeek API)
 Stdlib only. Subcommands:
   detect [--coder X] [--json] [--warm]  availability of colibri / deepseek / native (+ pref, chain)
   save <coder>                  store per-repo preference in .ba/config.json
-  generate --coder X --brief F --files a,b [--feedback F] [--base-dir D] [--prev-out F]
+  generate --coder X --brief F --files a,b [--feedback F] [--base-dir D] [--prev-out F] [--tier flash|pro]
                                 ask the coder for full file contents and write them
   warm [--coder X]              load the model + cache the system prompt (detect --warm runs it detached)
 Exit codes for generate: 0 applied, 10 CODER_UNAVAILABLE, 11 bad output.
@@ -23,6 +23,12 @@ CODERS = ("auto", "colibri", "deepseek", "native")
 # colibri serves OpenAI API on :8000/v1. 127.0.0.1, not localhost: on Windows localhost tries ::1 first (+0.8s).
 DEFAULT_COLIBRI_BASE = "http://127.0.0.1:8000/v1"
 DEFAULT_DEEPSEEK_BASE = "https://api.deepseek.com"
+# Used only if /models discovery fails. Legacy aliases deepseek-chat/-reasoner both map to flash, so pro needs a real id.
+FALLBACK_DEEPSEEK_MODEL = {"flash": "deepseek-flash", "pro": "deepseek-v4-pro", "": "deepseek-v4-pro"}
+TIERS = ("flash", "pro")
+# Billed on actual output, so a high cap is free unless used. Local servers reject caps above their context.
+MAX_TOKENS = {"deepseek": 65536, "colibri": 8192}
+TIMEOUT_S = {"deepseek": 1800, "colibri": 600}
 CONFIG = Path(".ba/config.json")
 EXIT_UNAVAILABLE = 10
 EXIT_BAD_OUTPUT = 11
@@ -108,6 +114,37 @@ def pick_colibri_model(cfg: dict, models: list[str]) -> str:
         return float(hit.group(1)) if hit else 0.0
     coders = sorted((m for m in models if "coder" in m.lower()), key=size, reverse=True)
     return (coders or models or [""])[0]
+
+
+def model_class(m: str) -> int:
+    low = m.lower()
+    return 2 if ("pro" in low or "reasoner" in low) else 0 if ("flash" in low or "lite" in low) else 1
+
+
+def pick_deepseek_model(models: list[str], tier: str = "") -> str:
+    # Newest version first (v5 > v4 > unversioned aliases), then pro/reasoner > chat/coder > flash/lite.
+    def rank(m: str):
+        hit = re.search(r"\bv(\d+)(?:\.(\d+))?", m.lower())
+        return (int(hit.group(1)), int(hit.group(2) or 0)) if hit else (0, 0), model_class(m)
+    if tier == "pro":
+        pool = [m for m in models if model_class(m) == 2]
+    elif tier == "flash":
+        pool = [m for m in models if model_class(m) == 0] or [m for m in models if model_class(m) == 1]
+    else:
+        pool = models
+    pool = pool or models
+    return max(pool, key=rank) if pool else FALLBACK_DEEPSEEK_MODEL[tier]
+
+
+def deepseek_model(cfg: dict, base: str, key: str, tier: str = "") -> str:
+    explicit = os.environ.get("DEEPSEEK_CODER_MODEL") or cfg.get("deepseek_model")
+    if explicit:
+        return explicit
+    try:
+        data = http_json(f"{base}/models", key=key, timeout=10).get("data", [])
+        return pick_deepseek_model([m["id"] for m in data if isinstance(m, dict) and "id" in m], tier)
+    except Exception:
+        return FALLBACK_DEEPSEEK_MODEL[tier]
 
 
 def chain_for(choice: str, colibri_up: bool, deepseek_ready: bool) -> list[str]:
@@ -217,13 +254,13 @@ def parse_blocks(text: str) -> list[tuple[str, str]]:
     return blocks
 
 
-def endpoint(coder: str, cfg: dict) -> tuple[str, str, str]:
+def endpoint(coder: str, cfg: dict, tier: str = "") -> tuple[str, str, str]:
     if coder == "deepseek":
         key = get_secret("DEEPSEEK_API_KEY")
         if not key:
             raise ConnectionError("DEEPSEEK_API_KEY missing")
         base = (os.environ.get("DEEPSEEK_API_BASE") or DEFAULT_DEEPSEEK_BASE).rstrip("/")
-        model = os.environ.get("DEEPSEEK_CODER_MODEL") or cfg.get("deepseek_model") or "deepseek-chat"
+        model = deepseek_model(cfg, base, key, tier)
     else:
         key = ""
         base = colibri_base(cfg)
@@ -234,26 +271,27 @@ def endpoint(coder: str, cfg: dict) -> tuple[str, str, str]:
     return base, key, model
 
 
-def call_coder(coder: str, cfg: dict, prompt: str, max_tokens: int = 0) -> tuple[str, dict]:
-    base, key, model = endpoint(coder, cfg)
+def call_coder(coder: str, cfg: dict, prompt: str, max_tokens: int = 0, tier: str = "") -> tuple[str, dict]:
+    base, key, model = endpoint(coder, cfg, tier)
     payload = {
         "model": model,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
         "temperature": 0,
         "stream": False,
-        "max_tokens": max_tokens or int(os.environ.get("BA_CODER_MAX_TOKENS", "8192")),
+        "max_tokens": max_tokens or int(os.environ.get("BA_CODER_MAX_TOKENS") or MAX_TOKENS[coder]),
     }
-    timeout = float(os.environ.get("BA_CODER_TIMEOUT", "600"))
+    timeout = float(os.environ.get("BA_CODER_TIMEOUT") or TIMEOUT_S[coder])
     resp = http_json(f"{base}/chat/completions", payload, key=key, timeout=timeout)
-    choices = resp.get("choices") or [{}]
-    return (choices[0].get("message") or {}).get("content") or "", resp.get("usage") or {}
+    choice = (resp.get("choices") or [{}])[0]
+    usage = dict(resp.get("usage") or {}, model=resp.get("model") or model, finish=choice.get("finish_reason"))
+    return (choice.get("message") or {}).get("content") or "", usage
 
 
 def usage_line(u: dict) -> str:
     cached = u.get("prompt_cache_hit_tokens")
     if cached is None:
         cached = (u.get("prompt_tokens_details") or {}).get("cached_tokens", "?")
-    return f"tokens in={u.get('prompt_tokens', '?')} cached={cached} out={u.get('completion_tokens', '?')}"
+    return f"model={u.get('model', '?')} tokens in={u.get('prompt_tokens', '?')} cached={cached} out={u.get('completion_tokens', '?')}"
 
 
 def cmd_warm(args) -> int:
@@ -279,7 +317,7 @@ def cmd_generate(args) -> int:
         prev_out = Path(args.prev_out).read_text(encoding="utf-8", errors="replace")
     prompt = build_prompt(Path(args.brief).read_text(encoding="utf-8"), allowed, feedback, args.base_dir, prev_out)
     try:
-        out, usage = call_coder(args.coder, cfg, prompt)
+        out, usage = call_coder(args.coder, cfg, prompt, tier=args.tier)
     except urllib.error.HTTPError as e:
         print(f"CODER_UNAVAILABLE {args.coder}: HTTP {e.code} {e.read()[:200]!r}")
         return EXIT_UNAVAILABLE
@@ -288,6 +326,10 @@ def cmd_generate(args) -> int:
         return EXIT_UNAVAILABLE
     if args.raw_out:
         Path(args.raw_out).write_text(out, encoding="utf-8")
+    if usage.get("finish") == "length":
+        print(usage_line(usage))
+        print("BAD_OUTPUT: TRUNCATED at max_tokens - output fewer/smaller files, or raise BA_CODER_MAX_TOKENS")
+        return EXIT_BAD_OUTPUT
     blocks = parse_blocks(out)
     if not blocks:
         print(f"{usage_line(usage)}")
@@ -323,6 +365,7 @@ def main() -> int:
     g.add_argument("--raw-out", default="")
     g.add_argument("--base-dir", default="")
     g.add_argument("--prev-out", default="")
+    g.add_argument("--tier", choices=TIERS, default="", help="deepseek model class picked by the PM")
     w = sub.add_parser("warm")
     w.add_argument("--coder", choices=("colibri", "deepseek"), default="colibri")
     args = ap.parse_args()

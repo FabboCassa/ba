@@ -42,6 +42,19 @@ def get_api_key() -> str:
                     return v.strip().strip("\"'")
         except Exception:
             pass
+    return read_key_file(Path.home() / ".ba" / "credentials.env")
+
+
+def read_key_file(path: Path) -> str:
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip().removeprefix("export ")
+            if not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                if k.strip() == "DEEPSEEK_API_KEY":
+                    return v.strip().strip("\"'")
+    except OSError:
+        pass
     return ""
 
 
