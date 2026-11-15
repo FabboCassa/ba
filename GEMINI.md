@@ -7,7 +7,7 @@ To maximize code quality while minimizing token consumption and cost, always rou
 
 | Role | Agent / Task | Antigravity (`agy` / IDE) Model | `invoke_subagent` Tier | Gemini CLI (`gemini`) Model | Why |
 |---|---|---|---|---|---|
-| **Orchestrator / Architect** | `/ba:architect`, `/ba:spec`, `/ba:issues`, `/ba:auto` | `gemini-4-argon-high` / `gemini-4-argon-medium` | `inherit` / `pro` | `gemini-3.1-pro-preview` (`pro`) | Deep reasoning, architecture, and wave coordination |
+| **Orchestrator / Architect** | `/ba:architect`, `/ba:spec`, `/ba:design`, `/ba:issues`, `/ba:auto` | `gemini-4-argon-high` / `gemini-4-argon-medium` | `inherit` / `pro` | `gemini-3.1-pro-preview` (`pro`) | Deep reasoning, architecture, and wave coordination |
 | **Writer (Codice & TDD)** | `ba:implementer` | `gemini-4-argon-high` / `gemini-4-argon-medium` | `pro` | `gemini-3.1-pro-preview` (`pro`) | Best coding quality for RED→GREEN tests and minimal diffs |
 | **Checker (Prove & Gate)** | `ba:verifier` | `gemini-3.8-flash-medium` | `flash` | `gemini-3.8-flash` (`flash`) | Runs deterministic bash proof scripts (`prove-test.sh`, `gate.sh`) and checks assertions at low token cost |
 | **Auditor (Optimize & Secure)** | `ba:auditor` | `gemini-3.8-flash-medium` | `flash` | `gemini-3.8-flash` (`flash`) | Fast read-only analysis of tool outputs, test durations, and call graphs |

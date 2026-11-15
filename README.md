@@ -113,6 +113,8 @@ Consigliati per `/ba:secure`: `gitleaks`, `osv-scanner`, `semgrep`, `jq`.
 |---|---|
 | `/ba:architect <idea>` | **Architettura totale**: progetta l'architettura completa di un nuovo software. Ti intervista, propone stack tecnologico, data model, hosting cloud (Azure/AWS/GCP/Hetzner), container & orchestrazione (Docker/K8s/Aspire), IaC (Terraform/Bicep) e genera tutti i diagrammi Mermaid C4 (contesto, container, componenti, ERD, sequenze, deploy). Scrive `docs/architecture/system-architecture.md`, `docs/architecture.md` (confermato) e la spec MVP per `/ba:issues`. |
 | `/ba:spec <idea>` | Ti intervista (risposta consigliata sempre per prima) finché non c'è nulla di aperto. Scrive `docs/specs/<slug>.md`. |
+| `/ba:design <cosa\|slug>` | **Design non da AI**: ti intervista finché la direzione visiva è chiara, propone 3 direzioni diverse tra loro (palette, font, layout, animazioni, superfici; la terza è un "jolly" fuori dal mood), fa un prototipo HTML, lo rifà a ogni tuo commento (chiedendo chiarimenti se il commento è vago) finché dici "va bene". Poi scrive `docs/design/<slug>/DESIGN.md`. |
+| `/ba:design-apply <slug> [auto\|percorsi\|issues]` | Applica il design approvato: `auto` = ovunque (token prima, poi componenti base, shell, schermate), oppure solo i file/schermate indicati, oppure `issues` per farlo passare dal flusso spec → issue. Comportamento invariato, gate + `design-lint` a ogni blocco. |
 | `/ba:issues <spec o audit>` | Spezza la spec (o un audit approvato) in issue piccole con dipendenze, criteri di accettazione testabili e **Kind** (come verrà provata). Crea le issue con `gh`. |
 | `/ba:implement <n>` | Branch → test prima → codice → **prova** (red→green, oppure nessuna regressione per refactor/perf, oppure scanner pulito per dipendenze/segreti) → gate veloce (`--tier fast`) nel loop → gate completo (`--tier full`) pre-PR → review → commit `Closes #n` → PR. Max 3 tentativi; ogni fallimento: causa scritta in `.ba/runs/<n>.md` e commento sull'issue. Dopo 3: label `blocked`. |
 | `/ba:auto [spec.md] [merge] [max=N]` | **Autonomo**: fa tutte le issue aperte (o crea le issue dalla spec approvata) senza chiedere nulla finché non ha finito. Uno scrive (`implementer`), altri due controllano (`verifier`, `reviewer`) senza vedere il ragionamento di chi scrive. Loop a test veloci (`--tier fast`), verifica completa pre-merge. Issue fallite 3 volte → `blocked` e passa alla successiva. Riprende da dove era rimasto (`.ba/auto.json`). |
@@ -334,6 +336,22 @@ Come si prova una fix di sicurezza:
 - **Anche per i tuoi commit**: `/ba:secure` propone di installare lo stesso controllo come hook git `pre-commit`/`pre-push` (`bash scripts/secret-guard.sh --install-git-hooks`; gli hook già presenti vengono mantenuti in catena).
 - **Scansione settimanale**: `templates/security.yml` → `.github/workflows/ba-security.yml` (proposto come issue, passa da PR). Gitleaks + osv-scanner ogni lunedì e a ogni push su main; se trova qualcosa apre (o aggiorna) una sola issue `security`. Zero token.
 
+### 6. `/ba:design` + `/ba:design-apply` — design che non sembra fatto da un'AI
+```
+/ba:design landing per una piscina all'aperto con prenotazione corsie
+```
+1. Legge il repo (colori, font, tema esistente) e ti intervista a giri di max 4 domande, risposta consigliata sempre per prima: cosa è e per chi, 3 aggettivi + 1 "mai", siti che ami/odi, vincoli (brand, dark mode, accessibilità), quanto osare e quante animazioni.
+2. `ba design-deal` estrae 3 combinazioni dal catalogo (`skills/design/references/catalog.json`: 18 palette, 17 coppie di font, 12 layout, 12 stili di animazione, 10 superfici) che **non condividono nulla tra loro** e **saltano quelle usate negli ultimi progetti** (`.ba/design/history.json`). L'AI le adatta al soggetto e te le mostra con wireframe ASCII + palette.
+3. Prototipo `docs/design/<slug>/proto-v1.html`: schermata chiave + foglio componenti (bottoni, input, errori, stati vuoti), solo token CSS, reduced-motion, 390→1440px. `ba design-lint` blocca i "tell" da AI (gradiente viola, crema+terracotta, Inter di default, fade-up ovunque, eyebrow in maiuscolo, "Unlock the power…", `→` nei bottoni).
+4. Tu dici cosa cambiare → se è vago ("più moderno") ti chiede 2-3 varianti concrete → `proto-v2.html` (le versioni vecchie restano). Si ripete finché dici **"va bene"**.
+5. Scrive `DESIGN.md` (token YAML + motivazioni, formato [DESIGN.md](https://github.com/google-labs-code/design.md)) con `status: approved` e registra le scelte per non ripeterle.
+```
+/ba:design-apply piscina auto                 # ovunque
+/ba:design-apply piscina src/components/ui    # solo lì
+/ba:design-apply piscina issues               # spec + /ba:issues
+```
+Branch `design/<slug>`, commit dei token per primo, poi blocchi da ~8 file con gate veloce + lint; alla fine gate completo, review del diff, conteggio colori/font hard-coded prima→dopo.
+
 ### Comandi di build/test personalizzati
 Se il rilevamento automatico non basta, crea `.ba/commands.env` nel repo:
 ```
@@ -347,6 +365,8 @@ LINT=pnpm eslint .
 docs/specs/<slug>.md          spec approvata + tabella issue
 docs/architecture.md          architettura confermata + regole (da /ba:optimize)
 docs/audits/optimize-*.md     audit di ottimizzazione
+docs/design/<slug>/           brief, prototipi proto-vN.html, DESIGN.md approvato
+.ba/design/history.json       scelte di design passate (evita design ripetitivi)
 .ba/plan.json                 issue, dipendenze, kind
 .ba/runs/<n>.md               motivi dei tentativi falliti
 .ba/auto.json|auto.md         stato e decisioni di /ba:auto
@@ -392,11 +412,12 @@ mcp/server.py                                        # Server Model Context Prot
 AGENTS.md, GEMINI.md                                 # Guide standard universali per coding agent
 templates/adapters/{gemini,cursor,windsurf,copilot,cline-roo,mcp} # Template per ogni AI
 .claude-plugin/{plugin,marketplace}.json             # Plugin nativo Claude Code
-skills/{architect,spec,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
+skills/{architect,spec,design,design-apply,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
 agents/{implementer,verifier,reviewer,auditor}.md
 scripts/{ba,detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard,delegate-coder}.sh
 scripts/{coder,model-resolver,deepseek-bridge}.py    # client coder esterni, routing modelli
-tests/test_coder.py                                  # python -m unittest discover -s tests
+scripts/{design-deal,design-lint}.py                 # direzioni di design variate, linter anti-slop
+tests/test_coder.py  tests/test_design.py                                  # python -m unittest discover -s tests
 hooks/hooks.json   templates/{terse-rules,spec,architecture,system-architecture,settings.auto.json,security.yml}
 ```
 Hook da aggiungere in `hooks/hooks.json` (accanto a `SessionStart` e `Stop` già presenti):
@@ -422,6 +443,17 @@ Hook da aggiungere in `hooks/hooks.json` (accanto a `SessionStart` e `Stop` già
 | drona23/claude-token-efficient | ~6k | MIT | CLAUDE.md terse, benchmark onesti |
 
 Strumenti esterni usati da `optimize`/`secure` (se installati, nessuno è obbligatorio): gitleaks, osv-scanner, semgrep, bandit, gosec, govulncheck, cargo-audit, pip-audit, knip, jscpd, vulture, staticcheck, dependency-cruiser, NetArchTest/ArchUnit/import-linter.
+
+### Design: repo valutate (stelle verificate il 2026-11-15, nessun testo copiato)
+| Repo | ★ | Licenza | Idea presa |
+|---|---|---|---|
+| anthropics/skills → `frontend-design` | ~195k | vedi LICENSE.txt | piano token → revisione contro il brief → codice; elenco dei look tipici da AI |
+| nextlevelbuilder/ui-ux-pro-max-skill | ~150k | MIT | catalogo ricercabile di stili/palette/font scelti per tipo di prodotto |
+| VoltAgent/awesome-design-md | ~128k | MIT | DESIGN.md come fonte unica per gli agenti |
+| Leonxlnx/taste-skill | ~116k | MIT | "il tipo di business decide tutto", un momento animato per pagina, gate in browser |
+| pbakaus/impeccable | ~110k | Apache-2.0 | motion thesis (momento focale/feedback/continuità), chiarire prima di cambiare |
+| Nutlope/hallmark | ~55k | MIT | 3 temi "distribuiti" per prompt + log per non ripetersi, linter anti-slop |
+| google-labs-code/design.md | ~29k | Apache-2.0 | formato DESIGN.md (token YAML + prosa) |
 
 ### Modalità autonoma: progetti simili valutati
 | Repo | ★ | Nota |

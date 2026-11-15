@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="0.15.0"
+VERSION="0.16.0"
 
 show_help() {
   cat <<EOF
@@ -34,6 +34,11 @@ External Pure Coder (optional, PM = your main AI):
                                            Coder writes, prove-test + gate fast, ≤2 zero-PM retries
                                            RESULT: PASS (0) | FAIL (3) | CODER_UNAVAILABLE (4)
 
+Design:
+  design-deal [--n 3] [--mood a,b] [--seed N]  Deal distinct style directions, skipping recent choices
+  design-deal record <slug> --palette ID ...   Record approved choices in .ba/design/history.json
+  design-lint [--strict] [--json] <paths...>   Flag AI-looking UI tells (gradients, fonts, fade-up, copy)
+
 Multi-AI Setup & Adapters:
   init <platform>                          Initialize adapter for target AI platform:
                                            (gemini, cursor, windsurf, copilot, roo, cline, mcp, all)
@@ -41,6 +46,8 @@ Multi-AI Setup & Adapters:
 AI Workflow Skills:
   /ba:architect <idea>                     Full system architecture, C4 diagrams, ERD, hosting & cloud topology
   /ba:spec <idea>                          Interview user until feature is fully specified -> docs/specs/<slug>.md
+  /ba:design <what|slug>                   Interview -> 3 distinct directions -> HTML prototype -> iterate -> DESIGN.md
+  /ba:design-apply <slug> [auto|paths|issues]  Apply the approved DESIGN.md everywhere or only where told
   /ba:issues <spec|audit>                  Break spec/audit into small GitHub issues with proof kind
   /ba:implement <n> [coder=X]              Implement one issue test-first with real proof
   /ba:auto [spec] [merge] [coder=X]        Fully autonomous execution of all issues
@@ -68,6 +75,11 @@ case "$cmd" in
     ;;
   prove-refactor)
     bash "$SCRIPT_DIR/prove-refactor.sh" "$@"
+    ;;
+  design-deal|design-lint)
+    PY=python; command -v python >/dev/null 2>&1 || PY=python3
+    if [ "$cmd" = design-deal ] && { [ $# -eq 0 ] || [[ "$1" == -* ]]; }; then set -- deal "$@"; fi
+    "$PY" "$SCRIPT_DIR/$cmd.py" "$@"
     ;;
   scan)
     bash "$SCRIPT_DIR/sec-scan.sh" "$@"
