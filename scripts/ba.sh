@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSION="0.16.0"
+VERSION="0.17.0"
 
 show_help() {
   cat <<EOF
@@ -39,6 +39,9 @@ Design:
   design-deal record <slug> --palette ID ...   Record approved choices in .ba/design/history.json
   design-lint [--strict] [--json] <paths...>   Flag AI-looking UI tells (gradients, fonts, fade-up, copy)
 
+Blender:
+  blender-vc init|status [dir]             Git + Git LFS setup for .blend/exports/textures (idempotent)
+
 Multi-AI Setup & Adapters:
   init <platform>                          Initialize adapter for target AI platform:
                                            (gemini, cursor, windsurf, copilot, roo, cline, mcp, all)
@@ -48,6 +51,9 @@ AI Workflow Skills:
   /ba:spec <idea>                          Interview user until feature is fully specified -> docs/specs/<slug>.md
   /ba:design <what|slug>                   Interview -> 3 distinct directions -> HTML prototype -> iterate -> DESIGN.md
   /ba:design-apply <slug> [auto|paths|issues]  Apply the approved DESIGN.md everywhere or only where told
+  /ba:blender-brief <what|slug>            Interview + reference analysis -> art/<slug>/BRIEF.md (+ Git LFS setup)
+  /ba:blender-proto <slug>                 Base in live Blender (blockout/bones/blocking/2D rough), iterate until approved
+  /ba:blender-build <slug>                 Full asset phase by phase, measured gates, final review loop
   /ba:issues <spec|audit>                  Break spec/audit into small GitHub issues with proof kind
   /ba:implement <n> [coder=X]              Implement one issue test-first with real proof
   /ba:auto [spec] [merge] [coder=X]        Fully autonomous execution of all issues
@@ -80,6 +86,9 @@ case "$cmd" in
     PY=python; command -v python >/dev/null 2>&1 || PY=python3
     if [ "$cmd" = design-deal ] && { [ $# -eq 0 ] || [[ "$1" == -* ]]; }; then set -- deal "$@"; fi
     "$PY" "$SCRIPT_DIR/$cmd.py" "$@"
+    ;;
+  blender-vc)
+    bash "$SCRIPT_DIR/blender-vc.sh" "$@"
     ;;
   scan)
     bash "$SCRIPT_DIR/sec-scan.sh" "$@"

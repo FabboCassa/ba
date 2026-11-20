@@ -115,6 +115,9 @@ Consigliati per `/ba:secure`: `gitleaks`, `osv-scanner`, `semgrep`, `jq`.
 | `/ba:spec <idea>` | Ti intervista (risposta consigliata sempre per prima) finché non c'è nulla di aperto. Scrive `docs/specs/<slug>.md`. |
 | `/ba:design <cosa\|slug>` | **Design non da AI**: ti intervista finché la direzione visiva è chiara, propone 3 direzioni diverse tra loro (palette, font, layout, animazioni, superfici; la terza è un "jolly" fuori dal mood), fa un prototipo HTML, lo rifà a ogni tuo commento (chiedendo chiarimenti se il commento è vago) finché dici "va bene". Poi scrive `docs/design/<slug>/DESIGN.md`. |
 | `/ba:design-apply <slug> [auto\|percorsi\|issues]` | Applica il design approvato: `auto` = ovunque (token prima, poi componenti base, shell, schermate), oppure solo i file/schermate indicati, oppure `issues` per farlo passare dal flusso spec → issue. Comportamento invariato, gate + `design-lint` a ogni blocco. |
+| `/ba:blender-brief <cosa\|slug>` | **Blender, passo 1**: descrivi cosa vuoi (modello 3D, modifica a un modello esistente, 2D Grease Pencil, animazione, rig, ambiente) e passi le immagini di riferimento. Le analizza (vista, ortho/prospettiva, cosa prendere/ignorare), ti fa domande a giri di max 4 finché non c'è nulla di aperto, imposta Git + LFS (e un repo GitHub privato se vuoi). Scrive `art/<slug>/BRIEF.md`. |
+| `/ba:blender-proto <slug>` | **Blender, passo 2**: crea la base dentro il tuo Blender aperto (blockout, esoscheletro di ossa, modifica non distruttiva, blocking dell'animazione, bozza 2D), la controlla da 5 angoli fissi e contro i riferimenti (IoU silhouette, misure), ogni versione è un commit. Iteri finché dici "ok"; rispetta le modifiche che fai tu a mano in Blender. |
+| `/ba:blender-build <slug>` | **Blender, passo 3**: sviluppa il prototipo approvato fase per fase (forme, dettaglio, topologia, UV, materiali, rig, animazione, presentazione, export) con gate numerici (deriva dal prototipo, misure ±1%, salute mesh, round-trip export). Alla fine turntable + tabella di accettazione e ti chiede se va bene. |
 | `/ba:issues <spec o audit>` | Spezza la spec (o un audit approvato) in issue piccole con dipendenze, criteri di accettazione testabili e **Kind** (come verrà provata). Crea le issue con `gh`. |
 | `/ba:implement <n>` | Branch → test prima → codice → **prova** (red→green, oppure nessuna regressione per refactor/perf, oppure scanner pulito per dipendenze/segreti) → gate veloce (`--tier fast`) nel loop → gate completo (`--tier full`) pre-PR → review → commit `Closes #n` → PR. Max 3 tentativi; ogni fallimento: causa scritta in `.ba/runs/<n>.md` e commento sull'issue. Dopo 3: label `blocked`. |
 | `/ba:auto [spec.md] [merge] [max=N]` | **Autonomo**: fa tutte le issue aperte (o crea le issue dalla spec approvata) senza chiedere nulla finché non ha finito. Uno scrive (`implementer`), altri due controllano (`verifier`, `reviewer`) senza vedere il ragionamento di chi scrive. Loop a test veloci (`--tier fast`), verifica completa pre-merge. Issue fallite 3 volte → `blocked` e passa alla successiva. Riprende da dove era rimasto (`.ba/auto.json`). |
@@ -352,6 +355,18 @@ Come si prova una fix di sicurezza:
 ```
 Branch `design/<slug>`, commit dei token per primo, poi blocchi da ~8 file con gate veloce + lint; alla fine gate completo, review del diff, conteggio colori/font hard-coded prima→dopo.
 
+### 7. Blender: `/ba:blender-brief` → `/ba:blender-proto` → `/ba:blender-build`
+Serve Blender 5.x con l'add-on MCP ufficiale (Blender Lab) connesso, e `git-lfs` installato.
+```
+/ba:blender-brief drago stilizzato per gioco Godot, riferimenti in C:\ref\drago
+```
+1. **Brief**: copia i riferimenti in `art/<slug>/ref/`, li analizza uno per uno (vista, angolo, ortho o prospettiva, cosa prendere e cosa ignorare), legge i modelli esistenti senza chiederti cosa contengono, poi ti intervista: tipo e uso finale, stile (famiglie concrete, non aggettivi), misure reali cercate online, parti, budget poligoni, clip di animazione, rig, formati di export, cosa sarà il prototipo. Tutto ciò che ha dedotto lo elenca in **Inferred** perché tu lo confermi.
+2. **Versioning**: Git + Git LFS (`ba blender-vc init`): `.blend`, export (FBX/GLB/USD/ABC), texture e immagini sotto `art/` vanno in LFS, i backup `.blend1` sono ignorati. Ogni `.blend` salvato ha accanto `<slug>.scene.json`: un riassunto testuale (oggetti, modificatori, materiali, ossa, azioni, conteggio poligoni) che rende **leggibile il diff su GitHub** anche se il `.blend` è binario. Il codice eseguito in Blender è salvato in `art/<slug>/build/*.py`. File `.blend` salvati compressi (più piccoli in LFS).
+3. **Prototipo**: costruisce la base nel tuo Blender (lo vedi in diretta; i riferimenti sono messi in scena come immagini), si controlla da solo con render da 5 angoli (`bkit.shots`) e confronto silhouette con i riferimenti ortografici (`bkit.compare`: IoU, proporzioni, larghezza per fasce, immagine di sovrapposizione rosso/blu). Ogni versione = un commit; `torna a v2` ripristina. Se il commento è vago ti propone 2-3 varianti affiancate in scena. "ok" → tag `<slug>-proto` e push.
+4. **Build**: fasi automatiche con gate (deriva rispetto al prototipo approvato IoU ≥0.90, misure ±1%, mesh sana, loop delle animazioni, round-trip dell'export). Alla fine turntable a 8 angoli e tabella di accettazione → tu dici ok o cosa cambiare (riparte dalla fase giusta). "ok" → tag `<slug>-v1`.
+
+Il kit (`scripts/blender/bkit.py`) gira dentro Blender, sia live via MCP sia in background, e non lascia tracce: camera temporanea e impostazioni di render ripristinate.
+
 ### Comandi di build/test personalizzati
 Se il rilevamento automatico non basta, crea `.ba/commands.env` nel repo:
 ```
@@ -366,6 +381,7 @@ docs/specs/<slug>.md          spec approvata + tabella issue
 docs/architecture.md          architettura confermata + regole (da /ba:optimize)
 docs/audits/optimize-*.md     audit di ottimizzazione
 docs/design/<slug>/           brief, prototipi proto-vN.html, DESIGN.md approvato
+art/<slug>/                   Blender: BRIEF.md, ref/, <slug>.blend (LFS) + <slug>.scene.json, build/*.py, review/, export/
 .ba/design/history.json       scelte di design passate (evita design ripetitivi)
 .ba/plan.json                 issue, dipendenze, kind
 .ba/runs/<n>.md               motivi dei tentativi falliti
@@ -412,12 +428,13 @@ mcp/server.py                                        # Server Model Context Prot
 AGENTS.md, GEMINI.md                                 # Guide standard universali per coding agent
 templates/adapters/{gemini,cursor,windsurf,copilot,cline-roo,mcp} # Template per ogni AI
 .claude-plugin/{plugin,marketplace}.json             # Plugin nativo Claude Code
-skills/{architect,spec,design,design-apply,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
+skills/{architect,spec,design,design-apply,blender-brief,blender-proto,blender-build,issues,implement,ship,auto,optimize,secure,terse}/SKILL.md
 agents/{implementer,verifier,reviewer,auditor}.md
 scripts/{ba,detect,gate,prove-test,prove-refactor,test-times,sec-scan,secret-guard,auto-guard,delegate-coder}.sh
 scripts/{coder,model-resolver,deepseek-bridge}.py    # client coder esterni, routing modelli
 scripts/{design-deal,design-lint}.py                 # direzioni di design variate, linter anti-slop
-tests/test_coder.py  tests/test_design.py                                  # python -m unittest discover -s tests
+scripts/blender/bkit.py  scripts/blender-vc.sh       # kit dentro Blender (render, IoU, snapshot, checks), Git LFS
+tests/test_*.py                                      # python -m unittest discover -s tests (Blender headless se installato)
 hooks/hooks.json   templates/{terse-rules,spec,architecture,system-architecture,settings.auto.json,security.yml}
 ```
 Hook da aggiungere in `hooks/hooks.json` (accanto a `SessionStart` e `Stop` già presenti):
@@ -454,6 +471,16 @@ Strumenti esterni usati da `optimize`/`secure` (se installati, nessuno è obblig
 | pbakaus/impeccable | ~110k | Apache-2.0 | motion thesis (momento focale/feedback/continuità), chiarire prima di cambiare |
 | Nutlope/hallmark | ~55k | MIT | 3 temi "distribuiti" per prompt + log per non ripetersi, linter anti-slop |
 | google-labs-code/design.md | ~29k | Apache-2.0 | formato DESIGN.md (token YAML + prosa) |
+
+### Blender: repo valutate (stelle verificate il 2026-11-20, nessun codice copiato)
+| Repo | ★ | Licenza | Idea presa |
+|---|---|---|---|
+| arjun988/blender-skills | ~4.5k | MIT | brief di produzione prima di modellare, prefissi di naming, loop di confronto limitato |
+| majidmanzarpour/blender-game-skills | ~190 | MIT | brief con tabella viste dei riferimenti, IoU silhouette + profilo a fasce, gate per fase, "il viewport non è una prova" |
+| RobLe3/cc-blender-skill | ~180 | MIT | misure reali cercate (mai indovinate), elenco onesto delle trappole di Blender 5.x |
+| jithinolickal/blender | ~10 | Apache-2.0 | angoli di ispezione fissi, una modifica alla volta, salvataggi di milestone |
+
+Versioning: benchmark di Blender Studio (Git LFS con `.blend` compressi), pattern LFS standard `*.blend filter=lfs`.
 
 ### Modalità autonoma: progetti simili valutati
 | Repo | ★ | Nota |

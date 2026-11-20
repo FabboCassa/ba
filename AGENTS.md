@@ -53,6 +53,8 @@ All AI agents can execute these bash scripts deterministically:
 | `delegate-coder.sh` | Detects external coders; delegates code writing + proof with zero-PM retries | `bash scripts/delegate-coder.sh --detect` / `ba delegate-code ...` |
 | `model-resolver.py` | Dynamic multi-model discovery and cross-family tier resolver | `python scripts/model-resolver.py [--flagship ds\|claude\|gemini]` |
 | `deepseek-bridge.py`| Lightweight native bridge for DeepSeek API discovery & chat | `python scripts/deepseek-bridge.py best-model` |
+| `blender-vc.sh` | Git + Git LFS setup for Blender assets (idempotent) | `bash scripts/blender-vc.sh init .` |
+| `blender/bkit.py` | In-Blender kit: multi-angle renders, silhouette IoU vs references, snapshot JSON, mesh checks | loaded via MCP `execute_blender_code` |
 
 ---
 
